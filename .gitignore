@@ -1,1 +1,4 @@
 .DS_Store
+plots/
+products/
+model_files/__pycache__/
