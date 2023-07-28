@@ -443,7 +443,7 @@ class siblings_galaxy:
 		"""
 
 		fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
-		fig.axes[0].set_title(r"Joint Siblings Distance Estimates",weight='bold',fontsize=self.FS+1)
+		fig.axes[0].set_title(r"Combination of Individual Distance Estimates",weight='bold',fontsize=self.FS+0.5)
 
 		Nmodes = int(len(self.common_distance_estimates))
 		deltas = [mini_d*(nn-(Nmodes-1)/2) for nn in range(Nmodes)]
@@ -473,13 +473,13 @@ class siblings_galaxy:
 				dy      = 0.02
 
 		for nn,mu,err in zip(np.arange(Nmodes),mus,errs):
-			fig.axes[0].annotate(f'{round(mu,3)}'+r'$\pm$'+f'{round(err,3)}',#+'\n(mag)',
+			fig.axes[0].annotate(f'{mu:.3f}'+r'$\pm$'+f'{err:.3f}',#+'(mag)',
 								 xy=(deltas[nn]-mini_d*0.4475,ylow-dy*3),color='black',fontsize=self.FS)
 			fig.axes[0].annotate(sig_labels[nn],
 								 xy=(deltas[nn],yhigh),color='black',fontsize=self.FS,ha='center')
 		fig.axes[0].annotate(r'$\sigma_{\rm{Rel}}$ Priors:',
 							xy=(deltas[1]-mini_d*0,yhigh+dy*1.5),color='black',fontsize=self.FS+1,weight='bold',ha='center')
-		fig.axes[0].annotate(r'Common-$\mu$'+'\nPosteriors:',
+		fig.axes[0].annotate(r'Common-$\mu$ Posteriors (mag):',
 							xy=(deltas[1]-mini_d*0,ylow-dy*1.5),color='black',fontsize=self.FS+1,weight='bold',ha='center')
 
 		fig.axes[0].set_xticks(deltas)
