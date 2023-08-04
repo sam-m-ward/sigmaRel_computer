@@ -417,7 +417,7 @@ class siblings_galaxy:
 		fig.axes[0].set_ylim([0,YMAX])
 		fig.text(0, 0.5, 'X', rotation=90, va='center', ha='center',color='white',fontsize=100)
 		fig.text(-0.06, 0.5, 'Posterior Density', rotation=90, va='center', ha='center',color='black',fontsize=self.FS)
-		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$',fontsize=self.FS)
+		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$ (mag)',fontsize=self.FS)
 		pl.tick_params(labelsize=self.FS)
 		pl.tight_layout()
 		fig.axes[0].set_xticks(np.arange(0,0.25,0.05))
