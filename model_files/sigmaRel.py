@@ -7,8 +7,15 @@ Operations for plotting individual siblings distances, computing sigma-rel poste
 
 Contains:
 --------------------
+multi_galaxy class:
+	inputs: dfmus,samplename='multigal',sigma0=0.1,prior_upper_bounds=[1.0],rootpath='./'
+
+	Methods are:
+		compute_analytic_multi_gal_sigmaRel_posterior()
+		loop_single_galaxy_analyses()
+
 siblings_galaxy class:
-	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,fontsize=18,show=False,save=True)
+	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,fontsize=18,show=False,save=True
 
 	Methods are:
 		get_sigmaRel_posterior(prior_distribution='uniform', prior_upper_bound = 1.0)
@@ -16,8 +23,8 @@ siblings_galaxy class:
 		get_CDF()
 		get_quantile(q)
 		get_weighted_mu()
-		combine_individual_distances(mode=None,overwrite=False)
-		plot_individual_distances(colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025)
+		combine_individual_distances(mode=None,overwrite=True)
+		plot_individual_distances(colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025,plot_full_errors=True)
 		plot_sigmaRel_posteriors(xupperlim=0.16,colours = ['green','purple','goldenrod'])
 		plot_common_distances(markersize=10,capsize=8,mini_d=0.025)
 --------------------
@@ -30,6 +37,103 @@ from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
 import os, pickle
+
+class multi_galaxy_siblings:
+
+	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,prior_upper_bounds=[1.0],rootpath='./'):
+		"""
+		Initialisation
+
+		Parameters
+		----------
+		dfmus : pandas df
+			dataframe of individual siblings distance estimates with columns Galaxy, SN, mus, mu_errs
+
+		samplename : str (optional; default='multigal')
+			name of multi-galaxy sample of siblings
+
+		sigma0 : float (optional; default=0.094~mag i.e. the W22 training value)
+			the total intrinsic scatter, i.e. informative prior upper bound on sigmaRel
+
+		prior_upper_bounds : list (optional; default=[1.0])
+			choices of sigmaRel prior upper bound
+
+		rootpath : str
+			path/to/sigmaRel/rootpath
+		"""
+		self.dfmus      = dfmus
+		self.samplename = samplename
+		self.sigma0     = sigma0
+		self.prior_upper_bounds = prior_upper_bounds
+		self.rootpath   = rootpath
+
+		self.modelpath   = self.rootpath  + 'model_files/'
+		self.stanpath    = self.modelpath + 'stan_files/'
+		self.productpath = self.rootpath  + 'products/'
+		self.plotpath    = self.rootpath  + 'plots/multi_galaxy_plots/'
+
+	def compute_analytic_multi_gal_sigmaRel_posterior(self):
+		"""
+		Compute Analytic Multi Galaxy sigmaRel Posterior
+
+		Method to compute analytic sigmaRel posterior by multiplying the single-galaxy likelihoods by the prior
+
+		End Product(s)
+		----------
+		Plot of multi-galaxy sigmaRel posterior
+
+		self.total_posteriors: dict
+			key,value pairs are the sigmaRel prior upper bound, and the posterior
+
+		self.sigRs_store: dict
+		 	same as self.total_posteriors, but the sigR prior grid
+		"""
+		#Initialise posteriors
+		total_posteriors = {p:1 for p in self.prior_upper_bounds} ; sigRs_store = {}
+		#For each galaxy, compute sigmaRel likelihood
+		for g,gal in enumerate(self.dfmus['Galaxy'].unique()):
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
+			sibgal = siblings_galaxy(dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,gal,sigma0=self.sigma0,prior_upper_bounds=self.prior_upper_bounds)
+			sibgal.get_sigmaRel_posteriors()
+			for p in self.prior_upper_bounds:
+				total_posteriors[p] *= sibgal.posteriors[p]*p #Multiply likelihoods, so divide out prior for each galaxy
+				if g==0:
+					total_posteriors[p] *= 1/p#Prior only appears once
+					sigRs_store[p] = sibgal.sigRs_store[p]
+
+		#Use single-galaxy class for plotting
+		for p in self.prior_upper_bounds:
+			sibgal.posteriors[p]  = total_posteriors[p]
+			sibgal.sigRs_store[p] = sigRs_store[p]
+
+		#Plot posteriors
+		sibgal.galname = self.samplename
+		sibgal.plotpath = self.plotpath
+		sibgal.plot_sigmaRel_posteriors()
+
+		#Store posteriors as attribute
+		self.total_posteriors = total_posteriors
+		self.sigRs_store      = sigRs_store
+
+
+	def loop_single_galaxy_analyses(self):
+		"""
+		Loop Single Galaxy Analyses
+
+		Method to take pandas df of multi-galaxy siblings distances, and do Ngal single-galaxy analyses
+
+		End Product(s)
+		----------
+		x3 plots per galaxy: Individual Distance Estimates, sigmaRel posteriors, Common-mu posteriors
+		"""
+		for gal in self.dfmus['Galaxy'].unique():
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
+			sibgal = siblings_galaxy(dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,gal,sigma0=self.sigma0)
+			sibgal.plot_individual_distances()
+			sibgal.plot_sigmaRel_posteriors()
+			sibgal.combine_individual_distances()
+			sibgal.plot_common_distances()
+
 
 
 class siblings_galaxy:
@@ -78,14 +182,14 @@ class siblings_galaxy:
 		self.names   = names
 		self.galname = galname
 		self.prior_upper_bounds = prior_upper_bounds
-		self.sigma0 = sigma0
-		self.Ngrid  = Ngrid
+		self.sigma0   = sigma0
+		self.Ngrid    = Ngrid
 		self.rootpath = rootpath
 		self.FS       = fontsize
 		self.save     = save
 		self.show     = show
 
-		self.Sg     = int(len(mus))
+		self.Sg         = int(len(mus))
 		self.fullerrors = np.array([self.sigma0**2 + err**2 for err in self.errors])**0.5
 
 		self.n_warmup   = 250
@@ -95,7 +199,7 @@ class siblings_galaxy:
 		self.modelpath   = self.rootpath  + 'model_files/'
 		self.stanpath    = self.modelpath + 'stan_files/'
 		self.productpath = self.rootpath  + 'products/'
-		self.plotpath    = self.rootpath  + 'plots/'
+		self.plotpath    = self.rootpath  + 'plots/single_galaxy_plots/'
 
 	def get_sigmaRel_posterior(self, prior_distribution='uniform', prior_upper_bound = 1.0):
 		"""
@@ -216,7 +320,7 @@ class siblings_galaxy:
 		self.weighted_mu     = sum(self.mus*weights)/sum(weights)
 		self.err_weighted_mu = (1/sum(weights))**0.5
 
-	def combine_individual_distances(self,mode=None,overwrite=False):
+	def combine_individual_distances(self,mode=None,overwrite=True):
 		"""
 		Combine Individual Distances
 
@@ -228,7 +332,7 @@ class siblings_galaxy:
 		mode : str (optional; default is None)
 			choice to define a specific intrinsic scatter modelling assumption, otherwise loops through all 3
 
-		overwrite : bool (optional; default=False)
+		overwrite : bool (optional; default=True)
 			if True, re-run stan fits
 
 		End Product(s)
@@ -290,8 +394,7 @@ class siblings_galaxy:
 		self.common_distance_estimates = STORE
 		self.FITS  = FITS
 
-
-	def plot_individual_distances(self,colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025):
+	def plot_individual_distances(self,colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025,plot_full_errors=True):
 		"""
 		Plot Individual Distances
 
@@ -314,6 +417,9 @@ class siblings_galaxy:
 		mini_d : float (optionl; default=0.025)
 			delta_x value for separating distances visually
 
+		plot_full_errors : bool (optional; default=True)
+			plot the full errors which include the sigma0 contribution
+
 		End Product
 		----------
 		Plot of individual distance estimates
@@ -321,29 +427,28 @@ class siblings_galaxy:
 		fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
 		fig.axes[0].set_title(r"Individual Siblings Distance Estimates",weight='bold',fontsize=self.FS+1)
 
-		if colours is None: colours = [c for c in ['C0','C1','C6','C2','C3','C4','C5','C7'][:self.Sg]]
+		if colours is None: colours = [f'C{s}' for s in range(self.Sg)]
 		if markers is None: markers = [m for m in ['o','s','p','^','x','P','d','*'][:self.Sg]]
 
 		deltas = [mini_d*(ss-(self.Sg-1)/2) for ss in range(self.Sg)]
 		for mu,err,fullerr,ss in zip(self.mus,self.errors,self.fullerrors,np.arange(self.Sg)):
 			fig.axes[0].errorbar(deltas[ss],mu,yerr=err,     color=colours[ss],marker=markers[ss],markersize=markersize,          linestyle='none',capsize=capsize, label=self.names[ss])
-			fig.axes[0].errorbar(deltas[ss],mu,yerr=fullerr, color=colours[ss],marker=markers[ss],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
+			if plot_full_errors:
+				fig.axes[0].errorbar(deltas[ss],mu,yerr=fullerr, color=colours[ss],marker=markers[ss],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
 			fig.axes[0].set_xticklabels("")
 
-		self.get_weighted_mu() ; Ylow = 32.85+0.02 ; Ylowplus = 32.9+0.02
-		#fig.axes[0].annotate(r'$\bar{\mu}$='+f'{round(self.weighted_mu,3)}'+r'$\pm$'+f'{round(self.err_weighted_mu,3)}' + ' mag',xy=(deltas[1]-mini_d/2,Ylowplus),color='black',fontsize=self.FS)
-		#fig.axes[0].annotate(r'Std. Dev.='+str(round(np.std(self.mus),3)) + ' mag',														   xy=(deltas[1]-mini_d/2,Ylow),    color='black',fontsize=self.FS)
-		dx = mini_d*0.2
-		fig.axes[0].annotate(r'Weighted-Average $\mu$:',		ha='left',xy=(deltas[0]-mini_d/3+dx,Ylowplus),color='black',fontsize=self.FS)
-		fig.axes[0].annotate(f'{round(self.weighted_mu,3)}'+r'$\pm$'+f'{round(self.err_weighted_mu,3)}' + ' mag',ha='right',xy=(deltas[2]+dx,Ylowplus),color='black',fontsize=self.FS)
-		fig.axes[0].annotate(r'Std. Dev. of $\mu$ Point Estimates:',	ha='left',xy=(deltas[0]-mini_d/3+dx,Ylow),    color='black',fontsize=self.FS)
-		fig.axes[0].annotate(str(round(np.std(self.mus),3)) + ' mag',											ha='right',xy=(deltas[2]+dx,Ylow),color='black',fontsize=self.FS)
+		self.get_weighted_mu()
+		Ylow  = min(self.mus)-self.fullerrors[np.argmin(self.mus)]*1.5 - 0.05
+		DY    = 0.03 ; dx = mini_d*0.2
+		fig.axes[0].annotate(r'Weighted-Average $\mu$:',		ha='left',xy=(deltas[0]-mini_d*0.6+dx,Ylow+DY),color='black',fontsize=self.FS)
+		fig.axes[0].annotate(f'{round(self.weighted_mu,3)}'+r'$\pm$'+f'{round(self.err_weighted_mu,3)}' + ' mag',ha='right',xy=(deltas[-1]+dx*1.5,Ylow+DY),color='black',fontsize=self.FS)
+		fig.axes[0].annotate(r'Std. Dev. of $\mu$ Point Estimates:',	ha='left',xy=(deltas[0]-mini_d*0.6+dx,Ylow),    color='black',fontsize=self.FS)
+		fig.axes[0].annotate(str(round(np.std(self.mus),3)) + ' mag',											ha='right',xy=(deltas[-1]+dx*1.5,Ylow),color='black',fontsize=self.FS)
 
-		fig.axes[0].annotate("NGC 3147's Siblings"+'\n'+r'$BayeSN$ Distance Estimates'+'\n'+r'$R_V^s \sim U(1,6)$',
-								xy = (deltas[0]-mini_d/4,max(self.mus)+np.std(self.mus)*1.25),
+		fig.axes[0].annotate(#f"NGC 3147's Siblings"+'\n'+r'$BayeSN$ Distance Estimates'+'\n'+r'$R_V^s \sim U(1,6)$',
+							 f"{self.galname}'s Siblings",#+'\n'+r'$BayeSN$ Distance Estimates'+'\n'+r'$R_V^s \sim U(1,6)$',
+								xy = (deltas[0]-mini_d*0.6+dx,Ylow+2*DY),ha='left',
 								fontsize=self.FS)
-
-
 		fig.axes[0].set_xticks(deltas)
 		fig.axes[0].set_xticklabels(self.names)
 		fig.axes[0].set_ylabel('Distance Modulus (mag)',fontsize=self.FS)
@@ -353,7 +458,7 @@ class siblings_galaxy:
 		fig.axes[0].set_xlabel('Siblings',fontsize=self.FS+3)
 		pl.tight_layout()
 		if self.save:
-			pl.savefig(f"{self.plotpath}IndividualDistances.pdf", bbox_inches="tight")
+			pl.savefig(f"{self.plotpath}{self.galname}_IndividualDistances.pdf", bbox_inches="tight")
 		if self.show:
 			pl.show()
 
@@ -422,7 +527,7 @@ class siblings_galaxy:
 		pl.tight_layout()
 		fig.axes[0].set_xticks(np.arange(0,0.25,0.05))
 		if self.save:
-			pl.savefig(f"{self.plotpath}SigmaRelPosteriors.pdf",bbox_inches="tight")
+			pl.savefig(f"{self.plotpath}{self.galname}_SigmaRelPosteriors.pdf",bbox_inches="tight")
 		if self.show:
 			pl.show()
 
@@ -491,6 +596,6 @@ class siblings_galaxy:
 		fig.axes[0].set_xlabel('Intrinsic Scatter Modelling Assumption',fontsize=self.FS+3)
 		pl.tight_layout()
 		if self.save:
-			pl.savefig(f"{self.plotpath}CommonDistances.pdf", bbox_inches="tight")
+			pl.savefig(f"{self.plotpath}{self.galname}_CommonDistances.pdf", bbox_inches="tight")
 		if self.show:
 			pl.show()
