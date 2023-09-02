@@ -93,7 +93,3 @@ class SiblingsDistanceSimulator:
 
         #End product
         self.dfmus = dfmus
-
-
-simulator = SiblingsDistanceSimulator()
-print (simulator.dfmus)
