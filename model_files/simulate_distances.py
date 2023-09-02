@@ -76,7 +76,7 @@ class SiblingsDistanceSimulator:
                     self.__dict__[x] = [y for _ in range(self.Ngal) for __ in range(self.Sg[_])]
 
         #Empty pandas df
-        dfmus = pd.DataFrame(columns=['Galaxy','SN','mu','mu_err'])
+        dfmus = pd.DataFrame(columns=['Galaxy','SN','mus','mu_errs'])
 
         #For each galaxy, simulate individual siblings distances, collate results into pandas df
         counter = -1
