@@ -12,19 +12,9 @@ dfmus     = simulator.dfmus
 multigal = multi_galaxy_siblings(dfmus)
 #multigal.loop_single_galaxy_analyses()
 #multigal.compute_analytic_multi_gal_sigmaRel_posterior()
-
-#multigal.sigmaRel_sampler(sigma0=0.1,sigmapec=250,use_external_distances=True)
 multigal.sigmaRel_sampler(sigma0='free',sigmapec='free',use_external_distances=True)
 
-'''
-for gal in dfmus['Galaxy'].unique():
-	dfgal  = dfmus[dfmus['Galaxy']==gal]
-	sibgal = siblings_galaxy(dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,gal,sigma0=0.1)
-	sibgal.plot_sigmaRel_posteriors()
-	sibgal.plot_individual_distances()
-	sibgal.combine_individual_distances()
-	sibgal.plot_common_distances()
-'''
+
 
 
 
