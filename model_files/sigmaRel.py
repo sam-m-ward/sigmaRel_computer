@@ -36,7 +36,7 @@ import arviz as az
 from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
-import os, pickle
+import copy, os, pickle, re
 
 class multi_galaxy_siblings:
 
@@ -68,9 +68,166 @@ class multi_galaxy_siblings:
 		self.rootpath   = rootpath
 
 		self.modelpath   = self.rootpath  + 'model_files/'
-		self.stanpath    = self.modelpath + 'stan_files/'
-		self.productpath = self.rootpath  + 'products/'
+		self.stanpath    = self.modelpath + 'stan_files/MultiGalFiles/'
+		self.productpath = self.rootpath  + 'products/multigal/'
 		self.plotpath    = self.rootpath  + 'plots/multi_galaxy_plots/'
+
+		self.n_warmup   = 1000
+		self.n_sampling = 5000
+		self.n_chains   = 4
+
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, use_external_distances=False,eta_sigmaRel_input=None,overwrite=True):
+		"""
+
+		"""
+		c_light = 299792458
+		if sigma0 is None:			sigma0   = self.sigma0	#If not specified, used the class input value (which if itself is not specified has a default value sigma0=0.1)
+		if sigmapec is None: 		sigmapec = 250			#If not specified, fix sigmapec
+		if eta_sigmaRel_input is None:
+			sigmaRel_input     = 0  #If not specified, free sigmaRel
+			eta_sigmaRel_input = 0
+		else:#Otherwise, fix sigmaRel to fraction of sigma0
+			assert(type(eta_sigmaRel_input) in [float,int])
+			assert(0<=eta_sigmaRel_input and eta_sigmaRel_input<=1)
+			sigmaRel_input     = 1
+
+		#Stan HBM files for the different intrinsic scatter modelling assumptions
+		sigmas   = {'sigma0':{'value':sigma0},'sigmapec':{'value':sigmapec}}
+		muextstr = {False:'no_muext',True:'with_muext'}[use_external_distances]
+		for label in sigmas.keys():
+			value = sigmas[label]['value']
+			if type(value) in [float,int] and value>0:
+				sigmastr = f"fixed_{label}{value}"
+				if (use_external_distances and label=='sigmapec') or label in ['sigma0']:
+					print (f"{label} fixed at {value}")
+			elif value=='free':
+				sigmastr = f"free_{label}"
+				print (f"{label} is a free hyperparameter")
+			else:
+				raise Exception(f"{label} must be float/int >0 or 'free', but {label}={value}")
+			sigmas[label]['str'] = sigmastr
+
+		#Model being used
+		modelkey = f"{sigmas['sigma0']['str']}_{muextstr}"
+		if sigmas['sigma0']['value']!='free' and not use_external_distances:
+			print('No external distances used')
+		elif sigmas['sigma0']['value']=='free' and not use_external_distances:
+			raise Exception('Freeing sigma0 without external distances')
+		else:
+			print ('Using external distances')
+			modelkey += f"_{sigmas['sigmapec']['str']}"
+		if bool(sigmaRel_input):
+			print (f"sigmaRel is fixed at {eta_sigmaRel_input}*sigma0")
+			modelkey += f"_etasigmaRelfixed{eta_sigmaRel_input}"
+		else:
+			print (f"sigmaRel is free hyperparameter")
+			modelkey += f"_sigmaRelfree"
+
+		"""
+		 POTENTIAL stan_files		:	 MODELKEYS
+		'sigmaRel_nomuext.stan'		:	'fixed_sigma0_no_muext'
+		'sigmaRe_withmuext.stan'	:	'fixed_sigma0_with_muext_fixed_sigmapec'
+										'fixed_sigma0_with_muext_free_sigmapec'
+										'free_sigma0_with_muext_fixed_sigmapec'
+										'free_sigma0_with_muext_free_sigmapec'
+		For each we can have sigmaRelfree OR etasigmaRelfixed
+		"""
+		stan_file = {True:'sigmaRel_withmuext.stan',False:'sigmaRel_nomuext.stan'}[use_external_distances]
+		with open(self.stanpath+stan_file,'r') as f:
+			stan_file = f.read().splitlines()
+		if ('fixed_sigmapec' in modelkey or 'fixed_sigma0' in modelkey) and use_external_distances:
+			for il, line in enumerate(stan_file):
+				if 'fixed_sigmapec' in modelkey:
+					if bool(re.match(r'\s*//real<lower=0,upper=1>\s*pec_unity;\s*//Data',line)):
+						stan_file[il] = line.replace('//real','real')
+					if bool(re.match(r'\s*real<lower=0,upper=1>\s*pec_unity;\s*//Model',line)):
+						stan_file[il] = line.replace('real','//real')
+					if bool(re.match(r'\s*pec_unity\s*~\s*uniform\(0,1\)',line)):
+						stan_file[il] = line.replace('pec_unity','//pec_unity')
+				if 'fixed_sigma0' in modelkey:
+					if bool(re.match(r'\s*//real<lower=0,upper=1>\s*sigma0;\s*//Data',line)):
+						stan_file[il] = line.replace('//real','real')
+					if bool(re.match(r'\s*real<lower=0,upper=1>\s*sigma0;\s*//Model',line)):
+						stan_file[il] = line.replace('real','//real')
+					if bool(re.match(r'\s*sigma0\s*~\s*uniform\(0,1\)',line)):
+						stan_file[il] = line.replace('sigma0','//sigma0')
+		stan_file = '\n'.join(stan_file)
+		print (stan_file)
+		with open(self.stanpath+'current_model.stan','w') as f:
+			f.write(stan_file)
+
+
+		#If files don't exist or overwrite, do stan fits
+		if not os.path.exists(self.productpath+f"FITS{self.samplename}{modelkey}.pkl") or overwrite:
+			#Pars of interest
+			pars = ['sigmaRel','sigma0','sigmapec']
+			#For each mode, perform stan fit to combine distances
+			print ('###'*30)
+			print (f"Beginning Stan fit: {modelkey}")
+			dfmus = copy.deepcopy(self.dfmus)
+			#Groupby galaxy to count Nsibs per galaxy
+			Gal   = dfmus.groupby('Galaxy',sort=False)[['muext_hats','zcmb_hats','zcmb_errs']].agg('mean')
+			Ng    = Gal.shape[0]
+			S_g   = dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
+			Nsibs = int(sum(S_g))
+			#Individual siblings distance estimates
+			mu_sib_phots     = dfmus['mus'].values
+			mu_sib_phot_errs = dfmus['mu_errs'].values
+			#External Distances
+			mu_ext_gal, zcmbs, zcmberrs = [Gal[col].tolist() for col in Gal.columns]
+
+			#Load up data
+			stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcmbs','zcmberrs','sigmaRel_input','eta_sigmaRel_input'],
+								 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcmbs , zcmberrs , sigmaRel_input , eta_sigmaRel_input ]))
+			if not use_external_distances:
+				stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcmbs','zcmberrs']}
+			if sigma0!='free':
+				stan_data['sigma0']    = sigma0
+				pars.remove('sigma0')
+			if sigmapec!='free':
+				stan_data['pec_unity'] = sigmapec*1e3/c_light
+				pars.remove('sigmapec')
+
+			model = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
+
+			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup)
+			fitsummary  = az.summary(fit)
+			df          = fit.draws_pd()
+
+			for col in pars:
+				print ('###'*10)
+				print (f'{col}, median, std, 16, 84 // 68%, 95%')
+				print (fitsummary.loc[col]['r_hat'])
+				print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
+				print (df[col].quantile(0.68).round(3),df[col].quantile(0.95).round(3))
+			#STORE = {'median':round(df['mu'].median(),3),'std':round(df['mu'].std(),3)}
+			#print (f"Fit Completed; Summary is:")
+			#print (fitsummary.loc[f'mu'])
+			#print ('Estimates of distance')
+			#print ('~~~'*30)
+			#print (f"dM-{mode.capitalize()} Common-mu = {round(df['mu'].median(),3)}+/-{round(df['mu'].std(),3)}")
+			#print ('~~~'*30)
+			#print ('###'*30)
+			err=1/0
+			#FIT = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
+			#with open(self.productpath+f"FITS{self.galname}.pkl",'wb') as f:
+			#	pickle.dump({'FIT':FIT,'common_distance_estimates':STORE},f)
+		else:#Else load up
+			with open(self.productpath+f"FITS{self.galname}.pkl",'rb') as f:
+				loader = pickle.load(f)
+			STORE = loader['common_distance_estimates']
+			FIT   = loader['FITS']
+
+		#Print distance summaries
+		print (STORE)
+		for x in STORE:
+			print (x,STORE[x])
+
+		#Save data, summaries and chains
+		self.common_distance_estimates = STORE
+		self.FITS  = FITS
+
+
 
 	def compute_analytic_multi_gal_sigmaRel_posterior(self):
 		"""
