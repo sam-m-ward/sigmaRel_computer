@@ -11,6 +11,7 @@ multi_galaxy class:
 	inputs: dfmus,samplename='multigal',sigma0=0.1,prior_upper_bounds=[1.0],rootpath='./'
 
 	Methods are:
+		sigmaRel_sampler(sigma0=None, sigmapec=None, use_external_distances=False,eta_sigmaRel_input=None,overwrite=True)
 		compute_analytic_multi_gal_sigmaRel_posterior()
 		loop_single_galaxy_analyses()
 
@@ -75,10 +76,43 @@ class multi_galaxy_siblings:
 		self.n_warmup   = 1000
 		self.n_sampling = 5000
 		self.n_chains   = 4
+		self.n_thin     = 1000
 
 	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, use_external_distances=False,eta_sigmaRel_input=None,overwrite=True):
 		"""
+		sigmaRel Sampler
 
+		Core method, used to take individual siblings distance estimates to multiple galaxies, and compute posteriors on sigmaRel
+		Options to:
+			- fix or free sigma0
+			- fix or free correlation coefficient rho = sigmalRel/sigma0
+			- fix or free sigmapec
+			- include external distance constraints
+
+		Parameters
+		----------
+		sigma0 : float, str or None (optional; default=None)
+			if None, set to self.sigma0
+			if float, fix to float and assert>0
+			if str, must be 'free'
+
+		sigmapec : float, str or None (optional; default=None)
+			same as for sigma0, default value is 250
+
+		use_external_distances : bool (optional; default=False)
+			option to include external distance constraints
+
+		eta_sigmaRel_input : float, or None (optional; default=None)
+			option to fix sigmaRel at a fraction of sigma0
+			if None, free sigmaRel
+			if float, assert between 0 and 1
+
+		overwrite : bool (optional; default=True)
+			option to overwrite previously saved .pkl posterior samples
+
+		End Product(s)
+		----------
+		self.FIT, posterior samples saved in self.productpath
 		"""
 		c_light = 299792458
 		if sigma0 is None:			sigma0   = self.sigma0	#If not specified, used the class input value (which if itself is not specified has a default value sigma0=0.1)
@@ -132,6 +166,8 @@ class multi_galaxy_siblings:
 										'free_sigma0_with_muext_free_sigmapec'
 		For each we can have sigmaRelfree OR etasigmaRelfixed
 		"""
+
+		#Update stan file according to choices, create temporary 'current_model.stan'
 		stan_file = {True:'sigmaRel_withmuext.stan',False:'sigmaRel_nomuext.stan'}[use_external_distances]
 		with open(self.stanpath+stan_file,'r') as f:
 			stan_file = f.read().splitlines()
@@ -158,13 +194,14 @@ class multi_galaxy_siblings:
 
 
 		#If files don't exist or overwrite, do stan fits
-		if not os.path.exists(self.productpath+f"FITS{self.samplename}{modelkey}.pkl") or overwrite:
+		if not os.path.exists(self.productpath+f"FIT{self.samplename}{modelkey}.pkl") or overwrite:
 			#Pars of interest
-			pars = ['sigmaRel','sigma0','sigmapec']
-			#For each mode, perform stan fit to combine distances
+			pars  = ['sigmaRel','sigma0','sigmapec']
+			#Data
+			dfmus = copy.deepcopy(self.dfmus)
+
 			print ('###'*30)
 			print (f"Beginning Stan fit: {modelkey}")
-			dfmus = copy.deepcopy(self.dfmus)
 			#Groupby galaxy to count Nsibs per galaxy
 			Gal   = dfmus.groupby('Galaxy',sort=False)[['muext_hats','zcmb_hats','zcmb_errs']].agg('mean')
 			Ng    = Gal.shape[0]
@@ -188,44 +225,43 @@ class multi_galaxy_siblings:
 				stan_data['pec_unity'] = sigmapec*1e3/c_light
 				pars.remove('sigmapec')
 
-			model = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
-
+			#Initialise and fit model
+			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
 			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup)
-			fitsummary  = az.summary(fit)
+			#fitsummary  = az.summary(fit)
 			df          = fit.draws_pd()
 
+			#Thin samples
+			if df.shape[0]>self.n_thin*self.n_chains:#Thin samples
+				print (f'Thinning samples down to {self.n_thin} per chain to save on space complexity')
+				Nthinsize = int(self.n_thin*self.n_chains)
+				df = df.iloc[0:df.shape[0]:int(df.shape[0]/Nthinsize)]						#thin to e.g. 1000 samples per chain
+				dfdict = df.to_dict(orient='list')											#change to dictionary so key,value is parameter name and samples
+				fit = {key:np.array_split(value,self.n_chains) for key,value in dfdict.items()}	#change samples so split into chains
+
+			#Fitsummary including Rhat valuess
+			fitsummary = az.summary(fit)#feed dictionary into arviz to get summary stats of thinned samples
+
+			#Save samples
+			FIT = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
+			with open(self.productpath+f"FIT{self.samplename}{modelkey}.pkl",'wb') as f:
+				pickle.dump(FIT,f)
+
+			#Print posterior summaries
+			print (f"Fit Completed; Summary is:")
 			for col in pars:
 				print ('###'*10)
 				print (f'{col}, median, std, 16, 84 // 68%, 95%')
-				print (fitsummary.loc[col]['r_hat'])
 				print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
 				print (df[col].quantile(0.68).round(3),df[col].quantile(0.95).round(3))
-			#STORE = {'median':round(df['mu'].median(),3),'std':round(df['mu'].std(),3)}
-			#print (f"Fit Completed; Summary is:")
-			#print (fitsummary.loc[f'mu'])
-			#print ('Estimates of distance')
-			#print ('~~~'*30)
-			#print (f"dM-{mode.capitalize()} Common-mu = {round(df['mu'].median(),3)}+/-{round(df['mu'].std(),3)}")
-			#print ('~~~'*30)
-			#print ('###'*30)
-			err=1/0
-			#FIT = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
-			#with open(self.productpath+f"FITS{self.galname}.pkl",'wb') as f:
-			#	pickle.dump({'FIT':FIT,'common_distance_estimates':STORE},f)
+				print ('Rhat:', fitsummary.loc[col]['r_hat'])
+
 		else:#Else load up
-			with open(self.productpath+f"FITS{self.galname}.pkl",'rb') as f:
-				loader = pickle.load(f)
-			STORE = loader['common_distance_estimates']
-			FIT   = loader['FITS']
+			with open(self.productpath+f"FIT{self.samplename}{modelkey}.pkl",'rb') as f:
+				FIT = pickle.load(f)
 
 		#Print distance summaries
-		print (STORE)
-		for x in STORE:
-			print (x,STORE[x])
-
-		#Save data, summaries and chains
-		self.common_distance_estimates = STORE
-		self.FITS  = FITS
+		self.FIT  = FIT
 
 
 
