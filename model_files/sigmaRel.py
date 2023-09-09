@@ -8,11 +8,14 @@ Operations for plotting individual siblings distances, computing sigma-rel poste
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='multigal',sigma0=0.1,prior_upper_bounds=[1.0],rootpath='./'
+	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'):
 
 	Methods are:
-		sigmaRel_sampler(sigma0=None, sigmapec=None, use_external_distances=False,eta_sigmaRel_input=None,overwrite=True)
-		compute_analytic_multi_gal_sigmaRel_posterior()
+		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
+		get_parlabels(pars)
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True)
+		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False):
+		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0])
 		loop_single_galaxy_analyses()
 
 siblings_galaxy class:
@@ -38,10 +41,12 @@ from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
 import copy, os, pickle, re
+from model_loader_script import *
+from plotting_script import *
 
 class multi_galaxy_siblings:
 
-	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,prior_upper_bounds=[1.0],rootpath='./'):
+	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'):
 		"""
 		Initialisation
 
@@ -53,38 +58,108 @@ class multi_galaxy_siblings:
 		samplename : str (optional; default='multigal')
 			name of multi-galaxy sample of siblings
 
-		sigma0 : float (optional; default=0.094~mag i.e. the W22 training value)
+		sigma0 : float (optional; default=0.1)
 			the total intrinsic scatter, i.e. informative prior upper bound on sigmaRel
 
-		prior_upper_bounds : list (optional; default=[1.0])
-			choices of sigmaRel prior upper bound
+		sigmapec : float, str or None (optional; default=250)
+			same as for sigma0, default value is 250 km/s
+
+		eta_sigmaRel_input : float, or None (optional; default=None)
+			option to fix sigmaRel at a fraction of sigma0
+			if None, free sigmaRel
+			if float, assert between 0 and 1
+
+		use_external_distances : bool (optional; default=False)
+			option to include external distance constraints
 
 		rootpath : str
 			path/to/sigmaRel/rootpath
 		"""
+		#Data
 		self.dfmus      = dfmus
 		self.samplename = samplename
-		self.sigma0     = sigma0
-		self.prior_upper_bounds = prior_upper_bounds
-		self.rootpath   = rootpath
 
+		#Model
+		self.sigma0                 = sigma0
+		self.sigmapec               = sigmapec
+		self.eta_sigmaRel_input     = eta_sigmaRel_input
+		self.use_external_distances = use_external_distances
+
+		#Paths
+		self.rootpath    = rootpath
 		self.modelpath   = self.rootpath  + 'model_files/'
 		self.stanpath    = self.modelpath + 'stan_files/MultiGalFiles/'
 		self.productpath = self.rootpath  + 'products/multigal/'
 		self.plotpath    = self.rootpath  + 'plots/multi_galaxy_plots/'
 
+		#Posterior Configuration
 		self.n_warmup   = 1000
 		self.n_sampling = 5000
 		self.n_chains   = 4
 		self.n_thin     = 1000
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, use_external_distances=False,eta_sigmaRel_input=None,overwrite=True):
+		#Other
+		self.c_light = 299792458
+
+	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances']):
+		"""
+		Updated Attributes
+
+		Method to update modelloader attributes to self.attributes
+
+		Parameters
+		----------
+		other_class : class
+			class with attributes to copy over
+
+		attributes_to_add : lst
+			names of attributes to copy over
+
+		End Product(s)
+		----------
+		self.__dict__ updated with other_class.__dict__ attributes in attributes_to_add
+		"""
+		for x in attributes_to_add:
+			self.__dict__[x] = other_class.__dict__[x]
+
+	def get_parlabels(self,pars):
+		"""
+		Get Parameter Labels
+
+		Method to grab names of parameters, their labels as they appear in posterior samples and in plots, and their prior lower/upper bounds
+
+		Parameters
+		----------
+		pars : lst
+		 	names of parameters to keep
+
+		End Product(s)
+		----------
+		self.parnames, self.dfparnames, self.parlabels, self.bounds
+		"""
+		#Initialisation
+		parnames   = ['sigmaRel','sigma0','sigmapec']
+		dfparnames = ['sigmaRel','sigma0','sigmapec']
+		parlabels  = ['$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_0$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)']
+		bounds     = [[0,None],[0,1],[0,self.c_light]]
+
+		#Filter on pars
+		PARS  = pd.DataFrame(data=dict(zip(['dfparnames','parlabels','bounds'],[dfparnames,parlabels,bounds])),index=parnames)
+		PARS = PARS.loc[pars]
+
+		#Set class attributes
+		self.parnames   = pars
+		self.dfparnames = PARS['dfparnames'].values
+		self.parlabels  = PARS['parlabels'].values
+		self.bounds     = PARS['bounds'].values
+
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True):
 		"""
 		sigmaRel Sampler
 
 		Core method, used to take individual siblings distance estimates to multiple galaxies, and compute posteriors on sigmaRel
 		Options to:
-			- fix or free sigma0
+			- fix or free sigma0å
 			- fix or free correlation coefficient rho = sigmalRel/sigma0
 			- fix or free sigmapec
 			- include external distance constraints
@@ -99,13 +174,13 @@ class multi_galaxy_siblings:
 		sigmapec : float, str or None (optional; default=None)
 			same as for sigma0, default value is 250
 
-		use_external_distances : bool (optional; default=False)
-			option to include external distance constraints
-
 		eta_sigmaRel_input : float, or None (optional; default=None)
 			option to fix sigmaRel at a fraction of sigma0
 			if None, free sigmaRel
 			if float, assert between 0 and 1
+
+		use_external_distances : bool (optional; default=False)
+			option to include external distance constraints
 
 		overwrite : bool (optional; default=True)
 			option to overwrite previously saved .pkl posterior samples
@@ -114,121 +189,28 @@ class multi_galaxy_siblings:
 		----------
 		self.FIT, posterior samples saved in self.productpath
 		"""
-		c_light = 299792458
-		if sigma0 is None:			sigma0   = self.sigma0	#If not specified, used the class input value (which if itself is not specified has a default value sigma0=0.1)
-		if sigmapec is None: 		sigmapec = 250			#If not specified, fix sigmapec
-		if eta_sigmaRel_input is None:
-			sigmaRel_input     = 0  #If not specified, free sigmaRel
-			eta_sigmaRel_input = 0
-		else:#Otherwise, fix sigmaRel to fraction of sigma0
-			assert(type(eta_sigmaRel_input) in [float,int])
-			assert(0<=eta_sigmaRel_input and eta_sigmaRel_input<=1)
-			sigmaRel_input     = 1
-
-		#Stan HBM files for the different intrinsic scatter modelling assumptions
-		sigmas   = {'sigma0':{'value':sigma0},'sigmapec':{'value':sigmapec}}
-		muextstr = {False:'no_muext',True:'with_muext'}[use_external_distances]
-		for label in sigmas.keys():
-			value = sigmas[label]['value']
-			if type(value) in [float,int] and value>0:
-				sigmastr = f"fixed_{label}{value}"
-				if (use_external_distances and label=='sigmapec') or label in ['sigma0']:
-					print (f"{label} fixed at {value}")
-			elif value=='free':
-				sigmastr = f"free_{label}"
-				print (f"{label} is a free hyperparameter")
-			else:
-				raise Exception(f"{label} must be float/int >0 or 'free', but {label}={value}")
-			sigmas[label]['str'] = sigmastr
-
-		#Model being used
-		modelkey = f"{sigmas['sigma0']['str']}_{muextstr}"
-		if sigmas['sigma0']['value']!='free' and not use_external_distances:
-			print('No external distances used')
-		elif sigmas['sigma0']['value']=='free' and not use_external_distances:
-			raise Exception('Freeing sigma0 without external distances')
-		else:
-			print ('Using external distances')
-			modelkey += f"_{sigmas['sigmapec']['str']}"
-		if bool(sigmaRel_input):
-			print (f"sigmaRel is fixed at {eta_sigmaRel_input}*sigma0")
-			modelkey += f"_etasigmaRelfixed{eta_sigmaRel_input}"
-		else:
-			print (f"sigmaRel is free hyperparameter")
-			modelkey += f"_sigmaRelfree"
-
-		"""
-		 POTENTIAL stan_files		:	 MODELKEYS
-		'sigmaRel_nomuext.stan'		:	'fixed_sigma0_no_muext'
-		'sigmaRe_withmuext.stan'	:	'fixed_sigma0_with_muext_fixed_sigmapec'
-										'fixed_sigma0_with_muext_free_sigmapec'
-										'free_sigma0_with_muext_fixed_sigmapec'
-										'free_sigma0_with_muext_free_sigmapec'
-		For each we can have sigmaRelfree OR etasigmaRelfixed
-		"""
-
-		#Update stan file according to choices, create temporary 'current_model.stan'
-		stan_file = {True:'sigmaRel_withmuext.stan',False:'sigmaRel_nomuext.stan'}[use_external_distances]
-		with open(self.stanpath+stan_file,'r') as f:
-			stan_file = f.read().splitlines()
-		if ('fixed_sigmapec' in modelkey or 'fixed_sigma0' in modelkey) and use_external_distances:
-			for il, line in enumerate(stan_file):
-				if 'fixed_sigmapec' in modelkey:
-					if bool(re.match(r'\s*//real<lower=0,upper=1>\s*pec_unity;\s*//Data',line)):
-						stan_file[il] = line.replace('//real','real')
-					if bool(re.match(r'\s*real<lower=0,upper=1>\s*pec_unity;\s*//Model',line)):
-						stan_file[il] = line.replace('real','//real')
-					if bool(re.match(r'\s*pec_unity\s*~\s*uniform\(0,1\)',line)):
-						stan_file[il] = line.replace('pec_unity','//pec_unity')
-				if 'fixed_sigma0' in modelkey:
-					if bool(re.match(r'\s*//real<lower=0,upper=1>\s*sigma0;\s*//Data',line)):
-						stan_file[il] = line.replace('//real','real')
-					if bool(re.match(r'\s*real<lower=0,upper=1>\s*sigma0;\s*//Model',line)):
-						stan_file[il] = line.replace('real','//real')
-					if bool(re.match(r'\s*sigma0\s*~\s*uniform\(0,1\)',line)):
-						stan_file[il] = line.replace('sigma0','//sigma0')
-		stan_file = '\n'.join(stan_file)
-		print (stan_file)
-		with open(self.stanpath+'current_model.stan','w') as f:
-			f.write(stan_file)
-
+		#Initialise model with choices
+		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, self)
+		#Get values, either default or user input
+		modelloader.get_model_params()
+		#Get string name for creating/saving files and models
+		modelloader.get_modelkey()
+		#Get specific stan model file
+		modelloader.update_stan_file()
+		#Update class with current values
+		self.update_attributes(modelloader)
 
 		#If files don't exist or overwrite, do stan fits
-		if not os.path.exists(self.productpath+f"FIT{self.samplename}{modelkey}.pkl") or overwrite:
-			#Pars of interest
-			pars  = ['sigmaRel','sigma0','sigmapec']
+		if not os.path.exists(self.productpath+f"FIT{self.samplename}{self.modelkey}.pkl") or overwrite:
 			#Data
 			dfmus = copy.deepcopy(self.dfmus)
-
-			print ('###'*30)
-			print (f"Beginning Stan fit: {modelkey}")
-			#Groupby galaxy to count Nsibs per galaxy
-			Gal   = dfmus.groupby('Galaxy',sort=False)[['muext_hats','zcmb_hats','zcmb_errs']].agg('mean')
-			Ng    = Gal.shape[0]
-			S_g   = dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
-			Nsibs = int(sum(S_g))
-			#Individual siblings distance estimates
-			mu_sib_phots     = dfmus['mus'].values
-			mu_sib_phot_errs = dfmus['mu_errs'].values
-			#External Distances
-			mu_ext_gal, zcmbs, zcmberrs = [Gal[col].tolist() for col in Gal.columns]
-
-			#Load up data
-			stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcmbs','zcmberrs','sigmaRel_input','eta_sigmaRel_input'],
-								 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcmbs , zcmberrs , sigmaRel_input , eta_sigmaRel_input ]))
-			if not use_external_distances:
-				stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcmbs','zcmberrs']}
-			if sigma0!='free':
-				stan_data['sigma0']    = sigma0
-				pars.remove('sigma0')
-			if sigmapec!='free':
-				stan_data['pec_unity'] = sigmapec*1e3/c_light
-				pars.remove('sigmapec')
+			#Get stan_data
+			stan_data   = modelloader.get_stan_data(dfmus)
+			self.pars   = modelloader.get_pars()
 
 			#Initialise and fit model
 			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
 			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup)
-			#fitsummary  = az.summary(fit)
 			df          = fit.draws_pd()
 
 			#Thin samples
@@ -243,13 +225,13 @@ class multi_galaxy_siblings:
 			fitsummary = az.summary(fit)#feed dictionary into arviz to get summary stats of thinned samples
 
 			#Save samples
-			FIT = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
-			with open(self.productpath+f"FIT{self.samplename}{modelkey}.pkl",'wb') as f:
+			FIT = dict(zip(['data','summary','chains','modelloader'],[stan_data,fitsummary,df]))
+			with open(self.productpath+f"FIT{self.samplename}{self.modelkey}.pkl",'wb') as f:
 				pickle.dump(FIT,f)
 
 			#Print posterior summaries
 			print (f"Fit Completed; Summary is:")
-			for col in pars:
+			for col in self.pars:
 				print ('###'*10)
 				print (f'{col}, median, std, 16, 84 // 68%, 95%')
 				print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
@@ -257,19 +239,90 @@ class multi_galaxy_siblings:
 				print ('Rhat:', fitsummary.loc[col]['r_hat'])
 
 		else:#Else load up
-			with open(self.productpath+f"FIT{self.samplename}{modelkey}.pkl",'rb') as f:
+			with open(self.productpath+f"FIT{self.samplename}{self.modelkey}.pkl",'rb') as f:
 				FIT = pickle.load(f)
 
 		#Print distance summaries
 		self.FIT  = FIT
 
+	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False):
+		"""
+		Plot Posterior Samples
+
+		Method to take posterior samples and plot them up
+
+		Parameters
+		----------
+		FS : float (optional; default=18)
+			fontsize for plotting
+
+		paperstyle : bool (optional; default=True)
+			if False, plot up Rhat values
+
+		quick : bool (optional; default=True)
+			if True, plot samples in 2D panels, if False, plot KDEs in 2D panel
+
+		show : bool (optional; default=False)
+			bool to show plots or not
+
+		save : bool (optional; default=True)
+			bool to save plots or not
+
+		returner : bool (optional; default=False)
+			if True, return posterior summaries for use in a Table
+
+		End Product(s)
+		----------
+		Plot
+		"""
+
+		#Get pars to plot
+		if 'modelkey' not in self.__dict__:
+			modelloader = ModelLoader(self.sigma0, self.sigmapec, self.eta_sigmaRel_input, self.use_external_distances, self)
+			modelloader.get_model_params()
+			modelloader.get_modelkey()
+			self.update_attributes(modelloader)
+			self.pars   = modelloader.get_pars()
+		self.get_parlabels(self.pars)
+
+		#Get posterior samples
+		if 'FIT' in self.__dict__.keys():
+			FIT = self.FIT
+		else:
+			savekey  = self.samplename+self.modelkey
+			filename = self.productpath+f"FIT{savekey}.pkl"
+			with open(filename,'rb') as f:
+				FIT = pickle.load(f)
+
+		#Get posterior data
+		df         = FIT['chains'] ; fitsummary = FIT['summary'] ; stan_data  = FIT['data']
+		Rhats      = {par:fitsummary.loc[par]['r_hat'] for par in self.dfparnames}
+		samples    = {par:np.asarray(df[par].values)   for par in self.dfparnames}
+		print ('Rhats:',Rhats)
+
+		#Corner Plot
+		self.plotting_parameters = {'FS':18,'paperstyle':True,'quick':True,'save':True,'show':False}
+		postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
+		Summary_Strs = postplot.corner_plot()#Table Summary
+		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
+		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
+		finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light),save,show,self.plotpath,savekey)
+
+		#Return posterior summaries
+		if returner: return Summary_Strs
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self):
+
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,prior_upper_bounds=[1.0]):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
 		Method to compute analytic sigmaRel posterior by multiplying the single-galaxy likelihoods by the prior
+
+		Parameters
+		----------
+		prior_upper_bounds : list (optional; default=[1.0])
+			choices of sigmaRel prior upper bound
 
 		End Product(s)
 		----------
@@ -281,6 +334,9 @@ class multi_galaxy_siblings:
 		self.sigRs_store: dict
 		 	same as self.total_posteriors, but the sigR prior grid
 		"""
+		#List of prior upper bounds to loop over
+		self.prior_upper_bounds = prior_upper_bounds
+
 		#Initialise posteriors
 		total_posteriors = {p:1 for p in self.prior_upper_bounds} ; sigRs_store = {}
 		#For each galaxy, compute sigmaRel likelihood
