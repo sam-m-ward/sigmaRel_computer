@@ -8,7 +8,7 @@ Operations for plotting individual siblings distances, computing sigma-rel poste
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'):
+	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'
 
 	Methods are:
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
