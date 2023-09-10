@@ -80,7 +80,7 @@ class ModelLoader:
 			self.eta_sigmaRel_input = self.choices.eta_sigmaRel_input
 		if self.eta_sigmaRel_input is None:
 			self.sigmaRel_input     = 0  #If not specified, free sigmaRel
-			self.eta_sigmaRel_input = 0
+			self.eta_sigmaRel_input = None
 		else:#Otherwise, fix sigmaRel to fraction of sigma0
 			assert(type(self.eta_sigmaRel_input) in [float,int])
 			assert(0<=self.eta_sigmaRel_input and self.eta_sigmaRel_input<=1)
