@@ -1,6 +1,6 @@
 data {
     int<lower=0> Ng;
-    int<lower=2> S_g[Ng];
+    array[Ng] int<lower=2> S_g;
     int <lower=Ng*2> Nsibs;
 
     vector[Nsibs] mu_sib_phots;
@@ -42,7 +42,7 @@ transformed parameters {
     vector[Ng] mu_ext_gal_errs;
     mu_ext_gal_errs = mu_ext_gal_err_prefac .* sqrt(square(pec_unity)+square(zcmberrs));
 
-    if (sigmaRel_input) {
+    if (sigmaRel_input!=0) {
       sigmaRel = eta_sigmaRel_input*sigma0;
     }
     else {

@@ -1,6 +1,6 @@
 data {
     int<lower=0> Ng;
-    int<lower=2> S_g[Ng];
+    array[Ng] int<lower=2> S_g;
     int <lower=Ng*2> Nsibs;
 
     vector[Nsibs] mu_sib_phots;
@@ -26,7 +26,7 @@ transformed parameters {
     vector[Nsibs] dM_sibs;
     real sigmaRel;
 
-    if (sigmaRel_input) {
+    if (sigmaRel_input!=0) {
       sigmaRel = eta_sigmaRel_input*sigma0;
     }
     else {
