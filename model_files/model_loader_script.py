@@ -115,6 +115,8 @@ class ModelLoader:
 					print (f"{label} fixed at {value}")
 			elif value=='free':
 				sigmastr = f"free_{label}"
+				if (not self.use_external_distances and label=='sigmapec'):
+					raise Exception(f"Freeing {label} without external distances")
 				print (f"{label} is a free hyperparameter")
 			else:
 				raise Exception(f"{label} must be float/int >0 or 'free', but {label}={value}")
@@ -208,6 +210,8 @@ class ModelLoader:
 		Ng    = Gal.shape[0]
 		S_g   = dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
 		Nsibs = int(sum(S_g))
+		for sg in S_g:
+			assert(sg>=2)
 		#Individual siblings distance estimates
 		mu_sib_phots     = dfmus['mus'].values
 		mu_sib_phot_errs = dfmus['mu_errs'].values
