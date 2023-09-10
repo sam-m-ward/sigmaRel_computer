@@ -599,7 +599,7 @@ class PARAMETER:
 					if ic==1: pl.annotate("({:.3f})".format(x_conf),xy=(0.735,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
 
 			if paperstyle:
-				ax[row,row].set_title(parlabel + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
+				ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
 				Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
 				print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
@@ -670,7 +670,7 @@ def get_Lines(stan_data, c_light):
 	S_g = stan_data['S_g']
 
 	fixed_sigmaRel     = bool(stan_data['sigmaRel_input'])
-	eta_sigmaRel_input = bool(stan_data['eta_sigmaRel_input'])
+	eta_sigmaRel_input = stan_data['eta_sigmaRel_input']
 	if 'sigma0' in stan_data:
 		fixed_sigma0 = True		;	sigma0 = stan_data['sigma0']
 	else:
@@ -698,13 +698,17 @@ def get_Lines(stan_data, c_light):
 				Line = f"$N_{{Gal}}\,$({S_g[0]} Sibs./Gal) = {Ng}"
 				Lines = [Line]
 			else:
-				Lines = [f"$N_{{Gal}}={Ng}$"]
 				Sgs = list(set(S_g))
 				Sgs.sort()
+				counts = {sg:list(S_g).count(sg) for sg in Sgs}
+				upper = "("
 				for sg in Sgs:
-					Line = f"$N_{{Gal}}\,$({sg} Sibs./Gal) = {S_g.count(sg)}"
-				Lines.append(Line)
-
+					upper += str(sg) + ', '
+				upper = upper[:-2]+')'
+				Line  = r"$N^{%s}_{Gal} = ("%upper
+				for sg in counts:
+					Line += str(counts[sg])+', '
+				Lines = [Line[:-2] + ")$"]
 		return Lines
 
 	def add_sigma_Line(Lines, fixed_sigma, substr, value, upper_bound, units):
@@ -733,7 +737,6 @@ def get_Lines(stan_data, c_light):
 				return f"{eta_sigmaRel_input}\sigma_0"
 
 	sigmaRelstr = get_sigmaRelstr(fixed_sigmaRel, eta_sigmaRel_input)
-
 
 	Lines = add_siblings_galaxies(Ng, S_g)
 	Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
