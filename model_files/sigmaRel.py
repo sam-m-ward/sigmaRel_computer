@@ -25,7 +25,7 @@ siblings_galaxy class:
 		get_sigmaRel_posterior(prior_distribution='uniform', prior_upper_bound = 1.0)
 		get_sigmaRel_posteriors()
 		get_CDF()
-		get_quantile(q)
+		get_quantile(q, return_index=True)
 		get_weighted_mu()
 		combine_individual_distances(mode=None,overwrite=True)
 		plot_individual_distances(colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025,plot_full_errors=True)
@@ -152,6 +152,10 @@ class multi_galaxy_siblings:
 		self.dfparnames = PARS['dfparnames'].values
 		self.parlabels  = PARS['parlabels'].values
 		self.bounds     = PARS['bounds'].values
+
+		if len(pars)==1 and pars[0]=='sigmaRel':
+			self.bounds = [0,self.sigma0]
+			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
 	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True):
 		"""
@@ -525,7 +529,7 @@ class siblings_galaxy:
 		"""
 		self.CDF = np.array([sum(self.posterior[:i])/sum(self.posterior) for i in range(len(self.posterior))])
 
-	def get_quantile(self, q):
+	def get_quantile(self, q, return_index=True):
 		"""
 		Get Quantile
 
@@ -543,11 +547,17 @@ class siblings_galaxy:
 
 		index_q : int
 			the index on the prior grid for that quantile
+
+		return_index : bool (optional; default=True)
+			if True, return the index of the quantile
 		"""
 		self.get_CDF()
 		index_q = np.argmin(np.abs(self.CDF-q))
 		sigR_q  = self.sigRs[index_q]
-		return sigR_q, index_q
+		if return_index:
+			return sigR_q, index_q
+		else:
+			return sigR_q
 
 	def get_weighted_mu(self):
 		"""
@@ -745,26 +755,54 @@ class siblings_galaxy:
 			#Plots
 			fig.axes[0].plot(self.sigRs, self.posterior,c=ccc)
 			fig.axes[0].plot([self.sigRs[-1],self.sigRs[-1]],[0,self.posterior[-1]],linestyle='--',c=ccc)
-			#Quantiles
-			sigma_68,index68 = self.get_quantile(0.68)
-			sigma_95,index95 = self.get_quantile(0.95)
-			fig.axes[0].fill_between(self.sigRs[0:index68+1],np.zeros(index68+1),self.posterior[:index68+1],color=ccc,alpha=alph*0.5)
-			fig.axes[0].plot([sigma_68,sigma_68],[0,self.posterior[index68]],c=ccc)
-			fig.axes[0].annotate(str(int(68))+str("%"),xy=(sigma_68,self.posterior[index68]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
-			fig.axes[0].fill_between(self.sigRs[0:index95+1],np.zeros(index95+1),self.posterior[:index95+1],color=ccc,alpha=alph*(1-0.5)*0.5)
-			fig.axes[0].plot([sigma_95,sigma_95],[0,self.posterior[index95]],c=ccc)
-			fig.axes[0].annotate(str(int(95))+str("%"),xy=(sigma_95,self.posterior[index95]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
-			#Annotations
+			#Begin Annotations
 			Xoff = 0.75 ; dX   = 0.08 ; Yoff = 0.845 ; dY   = 0.07
 			fig.axes[0].annotate('Prior Distribution',xy=(Xoff-0.06*1.55,Yoff+dY),xycoords='axes fraction',fontsize=15.5)
 			fig.axes[0].annotate('Posterior Summary',xy=(Xoff-0.06*1.55,Yoff+dY-0.275001*1.125),xycoords='axes fraction',fontsize=15.5)
 			LABEL = r'$\sigma_{\rm{Rel}} \sim U (0,%s)$'%(str(round(float(prior_upper_bound),3)))
 			fig.axes[0].annotate(LABEL,xy=(Xoff-0.06*1.55,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc)
+			#Decide how to summarise posterior
+			KDE = copy.deepcopy(self.posterior)
+			imode = np.argmax(KDE)
+			xmode = self.sigRs[imode] ; KDEmode = KDE[imode]
+			condition1 = np.argmax(KDE)!=0 and np.argmax(KDE)!=len(KDE)-1#KDE doesnt peak at prior boundary
+			hh = np.exp(-1/8)#Gaussian height at sigma/2 #KDE is not near flat topped at prior boundary
+			condition2 = not (KDE[0]>=hh*KDEmode or KDE[-1]>=hh*KDEmode)
 			Yoff += -0.275001*1.125
-			fig.axes[0].annotate("%s <"%r'$\sigma_{\rm{Rel}}$',       xy=(Xoff-0.01    ,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
-			fig.axes[0].annotate("{:.3f}".format(sigma_68),  xy=(Xoff+dX+0.02,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
-			fig.axes[0].annotate("({:.3f})".format(sigma_95),xy=(Xoff+dX+0.0313,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
+			if condition1 and condition2:
+				sigma_50,index50 = self.get_quantile(0.50)
+				fig.axes[0].plot(np.ones(2)*self.sigRs[index50],[0,KDE[index50]],c=ccc)
+				sigma_16,index16 = self.get_quantile(0.16)
+				sigma_84,index84 = self.get_quantile(0.84)
+				index84 += 1
+				fig.axes[0].fill_between(self.sigRs[index16:index84],np.zeros(index84-index16),KDE[index16:index84],color=ccc,alpha=alph)
+				summary = ["{:.3f}".format(x) for x in [self.sigRs[index50],self.sigRs[index84-1]-self.sigRs[index50],self.sigRs[index50]-self.sigRs[index16]] ]
+				fig.axes[0].annotate(r"$\sigma_{\rm{Rel}} = %s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), xy=(Xoff-0.01+0.163,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
+			else:
+				#Quantiles
+				if imode>0.5*(len(self.sigRs)-1):#If peaks at RHS
+					sigma_68,index68 = self.get_quantile(1-0.68)
+					sigma_95,index95 = self.get_quantile(1-0.95)
+					fig.axes[0].fill_between(self.sigRs[index68:],np.zeros(len(self.sigRs)-index68),self.posterior[index68:],color=ccc,alpha=alph*0.5)
+					fig.axes[0].fill_between(self.sigRs[index95:],np.zeros(len(self.sigRs)-index95),self.posterior[index95:],color=ccc,alpha=alph*(1-0.5)*0.5)
+					lg = '>'
+				else:
+					sigma_68,index68 = self.get_quantile(0.68)
+					sigma_95,index95 = self.get_quantile(0.95)
+					fig.axes[0].fill_between(self.sigRs[0:index68+1],np.zeros(index68+1),self.posterior[:index68+1],color=ccc,alpha=alph*0.5)
+					fig.axes[0].fill_between(self.sigRs[0:index95+1],np.zeros(index95+1),self.posterior[:index95+1],color=ccc,alpha=alph*(1-0.5)*0.5)
+					lg = '<'
+
+				fig.axes[0].plot([sigma_68,sigma_68],[0,self.posterior[index68]],c=ccc)
+				fig.axes[0].plot([sigma_95,sigma_95],[0,self.posterior[index95]],c=ccc)
+				fig.axes[0].annotate(str(int(68))+str("%"),xy=(sigma_68,self.posterior[index68]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
+				fig.axes[0].annotate(str(int(95))+str("%"),xy=(sigma_95,self.posterior[index95]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
+				#Continue Annotations
+				fig.axes[0].annotate("%s %s"%(r'$\sigma_{\rm{Rel}}$',lg),       xy=(Xoff-0.01    ,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
+				fig.axes[0].annotate("{:.3f}".format(sigma_68),  xy=(Xoff+dX+0.02,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
+				fig.axes[0].annotate("({:.3f})".format(sigma_95),xy=(Xoff+dX+0.0313,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			Yoff +=  0.275001
+
 		fig.axes[0].set_yticks([])
 		YMIN,YMAX = list(pl.gca().get_ylim())[:]
 		pl.gca().set_xlim([0,xupperlim])
