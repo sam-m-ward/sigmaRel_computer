@@ -77,6 +77,8 @@ class ModelLoader:
 		if self.sigmapec is None:
 			self.sigmapec = self.choices.sigmapec #If not specified, use the class input value (which if itself is not specified has a default value sigmapec=250)
 		if self.eta_sigmaRel_input is None:
+			self.eta_sigmaRel_input = self.choices.eta_sigmaRel_input
+		if self.eta_sigmaRel_input is None:
 			self.sigmaRel_input     = 0  #If not specified, free sigmaRel
 			self.eta_sigmaRel_input = 0
 		else:#Otherwise, fix sigmaRel to fraction of sigma0
