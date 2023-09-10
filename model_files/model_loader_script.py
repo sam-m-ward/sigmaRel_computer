@@ -15,7 +15,7 @@ ModelLoader class:
 		get_modelkey()
 		update_stan_file()
 		get_stan_data(dfmus)
-		get_pars(pars=['sigmaRel','sigma0','sigmapec'])
+		get_pars()
 --------------------
 
 Written by Sam M. Ward: smw92@cam.ac.uk
@@ -80,7 +80,6 @@ class ModelLoader:
 			self.eta_sigmaRel_input = self.choices.eta_sigmaRel_input
 		if self.eta_sigmaRel_input is None:
 			self.sigmaRel_input     = 0  #If not specified, free sigmaRel
-			self.eta_sigmaRel_input = None
 		else:#Otherwise, fix sigmaRel to fraction of sigma0
 			assert(type(self.eta_sigmaRel_input) in [float,int])
 			assert(0<=self.eta_sigmaRel_input and self.eta_sigmaRel_input<=1)
@@ -217,10 +216,10 @@ class ModelLoader:
 		mu_sib_phot_errs = dfmus['mu_errs'].values
 		#External Distances
 		mu_ext_gal, zcmbs, zcmberrs = [Gal[col].tolist() for col in Gal.columns]
-
+		def etamapper(x): return 0 if x is None else x
 		#Load up data
 		stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcmbs','zcmberrs','sigmaRel_input','eta_sigmaRel_input'],
-							 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcmbs , zcmberrs , self.sigmaRel_input , self.eta_sigmaRel_input ]))
+							 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcmbs , zcmberrs , self.sigmaRel_input , etamapper(self.eta_sigmaRel_input) ]))
 		if not self.use_external_distances:
 			stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcmbs','zcmberrs']}
 		if self.sigma0!='free':
@@ -230,21 +229,17 @@ class ModelLoader:
 
 		return stan_data
 
-	def get_pars(self,pars=['sigmaRel','sigma0','sigmapec']):
+	def get_pars(self):
 		"""
 		Get parameters
 
 		Based on information, drop parameters if they are in fact fixed
 
-		Parameters
-		----------
-		pars : lst
-			full list of parameter names
-
 		Returns
 		----------
 		pars with appropriate parameter names removed
 		"""
+		pars=['sigmaRel','sigma0','sigmapec']
 		if self.sigma0!='free':
 			pars.remove('sigma0')
 		if self.sigmapec!='free':
