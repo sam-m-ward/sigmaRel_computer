@@ -77,6 +77,7 @@ class SiblingsDistanceSimulator:
                 if x=='Sg':
                     for sg in y:
                         assert(type(sg) is int)
+                        assert(sg>=2)
                 elif x=='sigma_fit_s':
                     for sig in y:
                         assert(sig>0)
