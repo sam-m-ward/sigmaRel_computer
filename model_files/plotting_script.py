@@ -327,6 +327,7 @@ class POSTERIOR_PLOTTER:
 		#Create figure
 		sfigx,sfigy = 3.1*len(pardict),2.7*len(pardict)
 		fig,ax = pl.subplots(len(pardict),len(pardict),figsize=(sfigx,sfigy),sharex='col',sharey=False)
+		if len(pardict)==1:	ax = np.array([[ax]])
 
 		print ("###"*5)
 		Summary_Strs = {}
@@ -634,10 +635,10 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey):
 	plot that is saved and/or shown
 	"""
 	delta_y = 0.15
-	pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3),len(ax)-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
-	#pl.annotate(Lines[0],          xy=(0.5,len(ax)-1-0.5-delta_y/2),xycoords='axes fraction',fontsize=17,color='black',weight='bold',ha='center')
-	for counter,line in enumerate(Lines):#[1:]):
-		pl.annotate(line, xy=(1,len(ax)-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color='C0',ha='right')#weight='bold'
+	DX      = 0 + (len(ax)==1)*1.1
+	pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,len(ax)-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
+	for counter,line in enumerate(Lines):
+		pl.annotate(line, xy=(1+DX,len(ax)-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color='C0',ha='right')#weight='bold'
 	fig.subplots_adjust(top=0.9)
 	fig.subplots_adjust(wspace=0.075, hspace=0.075)
 	if save:
