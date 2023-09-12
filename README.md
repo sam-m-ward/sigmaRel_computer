@@ -26,7 +26,7 @@ There is a high degree of user freedom in the multi-galaxy analysis, where $\sig
 
 Check out [**installation_instructions.md**](https://github.com/sam-m-ward/sigmaRel_computer/blob/main/installation_instructions.md) to clone the repo and set up a conda environment.
 
-See [**tutorial.ipynb**](https://github.com/sam-m-ward/birdsnack/blob/main/demo_notebook.ipynb) for a quick introduction to the use cases of sigmaRel_computer.
+See [**tutorial.ipynb**](https://github.com/sam-m-ward/birdsnack/blob/main/demo_notebook.ipynb) for a quick practitioner's introduction to sigmaRel_computer.
 
 ## Acknowledgements
 
