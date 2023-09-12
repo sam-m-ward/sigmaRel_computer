@@ -15,7 +15,7 @@ multi_galaxy class:
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True)
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False):
-		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0])
+		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],show=False,save=True)
 		loop_single_galaxy_analyses()
 
 siblings_galaxy class:
@@ -305,7 +305,7 @@ class multi_galaxy_siblings:
 		print ('Rhats:',Rhats)
 
 		#Corner Plot
-		self.plotting_parameters = {'FS':18,'paperstyle':True,'quick':True,'save':True,'show':False}
+		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
 		postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
 		Summary_Strs = postplot.corner_plot()#Table Summary
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
@@ -317,7 +317,7 @@ class multi_galaxy_siblings:
 
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self,prior_upper_bounds=[1.0]):
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,prior_upper_bounds=[1.0],show=False,save=True):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
@@ -327,6 +327,12 @@ class multi_galaxy_siblings:
 		----------
 		prior_upper_bounds : list (optional; default=[1.0])
 			choices of sigmaRel prior upper bound
+
+		show : bool (optional; default=False)
+			bool to show plots or not
+
+		save : bool (optional; default=True)
+			bool to save plots or not
 
 		End Product(s)
 		----------
@@ -345,8 +351,8 @@ class multi_galaxy_siblings:
 		total_posteriors = {p:1 for p in self.prior_upper_bounds} ; sigRs_store = {}
 		#For each galaxy, compute sigmaRel likelihood
 		for g,gal in enumerate(self.dfmus['Galaxy'].unique()):
-			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
-			sibgal = siblings_galaxy(dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,gal,sigma0=self.sigma0,prior_upper_bounds=self.prior_upper_bounds)
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]												#Use dummy value for sigma0
+			sibgal = siblings_galaxy(dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,gal,sigma0=0.1,prior_upper_bounds=self.prior_upper_bounds)
 			sibgal.get_sigmaRel_posteriors()
 			for p in self.prior_upper_bounds:
 				total_posteriors[p] *= sibgal.posteriors[p]*p #Multiply likelihoods, so divide out prior for each galaxy
@@ -360,9 +366,11 @@ class multi_galaxy_siblings:
 			sibgal.sigRs_store[p] = sigRs_store[p]
 
 		#Plot posteriors
-		sibgal.galname = self.samplename
+		sibgal.show     = show
+		sibgal.save     = save
+		sibgal.galname  = self.samplename
 		sibgal.plotpath = self.plotpath
-		sibgal.plot_sigmaRel_posteriors()
+		sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive')
 
 		#Store posteriors as attribute
 		self.total_posteriors = total_posteriors
@@ -729,7 +737,7 @@ class siblings_galaxy:
 
 		Parameters
 		----------
-		xupperlim : float
+		xupperlim : float or 'adaptive' (optional; default=0.25)
 			define maximum x-value (i.e. sigmaRel value) on plot for visualisation purposes only
 
 		colours : lst (optional; default=None)
@@ -739,8 +747,6 @@ class siblings_galaxy:
 		----------
 		plot of sigmaRel posterior overlays
 		"""
-
-
 		alph = 0.2 ; dfs = 3
 		if 'posteriors' not in list(self.__dict__.keys()):
 			self.get_sigmaRel_posteriors()
@@ -748,6 +754,7 @@ class siblings_galaxy:
 
 		fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
 		pl.title(r'$\sigma_{\rm{Rel}}$-Posterior from Individual Distance Estimates',fontsize=self.FS+1, weight='bold')
+		XQs = {0.005:[],0.995:[]}
 		for ip,prior_upper_bound in enumerate(self.prior_upper_bounds):
 			ccc = colours[ip]
 			self.posterior = self.posteriors[prior_upper_bound]
@@ -756,11 +763,11 @@ class siblings_galaxy:
 			fig.axes[0].plot(self.sigRs, self.posterior,c=ccc)
 			fig.axes[0].plot([self.sigRs[-1],self.sigRs[-1]],[0,self.posterior[-1]],linestyle='--',c=ccc)
 			#Begin Annotations
-			Xoff = 0.75 ; dX   = 0.08 ; Yoff = 0.845 ; dY   = 0.07
-			fig.axes[0].annotate('Prior Distribution',xy=(Xoff-0.06*1.55,Yoff+dY),xycoords='axes fraction',fontsize=15.5)
-			fig.axes[0].annotate('Posterior Summary',xy=(Xoff-0.06*1.55,Yoff+dY-0.275001*1.125),xycoords='axes fraction',fontsize=15.5)
+			Xoff = 0.65 ; dX   = 0.08 ; Yoff = 0.845 ; dY   = 0.07
+			fig.axes[0].annotate('Prior Distribution',xy=(Xoff,Yoff+dY),			   xycoords='axes fraction',fontsize=15.5, ha='left')
+			fig.axes[0].annotate('Posterior Summary', xy=(Xoff,Yoff+dY-0.275001*1.125),xycoords='axes fraction',fontsize=15.5, ha='left')
 			LABEL = r'$\sigma_{\rm{Rel}} \sim U (0,%s)$'%(str(round(float(prior_upper_bound),3)))
-			fig.axes[0].annotate(LABEL,xy=(Xoff-0.06*1.55,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc)
+			fig.axes[0].annotate(LABEL,xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			#Decide how to summarise posterior
 			KDE = copy.deepcopy(self.posterior)
 			imode = np.argmax(KDE)
@@ -769,6 +776,8 @@ class siblings_galaxy:
 			hh = np.exp(-1/8)#Gaussian height at sigma/2 #KDE is not near flat topped at prior boundary
 			condition2 = not (KDE[0]>=hh*KDEmode or KDE[-1]>=hh*KDEmode)
 			Yoff += -0.275001*1.125
+			for q in XQs:
+				XQs[q].append(self.get_quantile(q)[0])
 			if condition1 and condition2:
 				sigma_50,index50 = self.get_quantile(0.50)
 				fig.axes[0].plot(np.ones(2)*self.sigRs[index50],[0,KDE[index50]],c=ccc)
@@ -777,7 +786,7 @@ class siblings_galaxy:
 				index84 += 1
 				fig.axes[0].fill_between(self.sigRs[index16:index84],np.zeros(index84-index16),KDE[index16:index84],color=ccc,alpha=alph)
 				summary = ["{:.3f}".format(x) for x in [self.sigRs[index50],self.sigRs[index84-1]-self.sigRs[index50],self.sigRs[index50]-self.sigRs[index16]] ]
-				fig.axes[0].annotate(r"$\sigma_{\rm{Rel}} = %s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), xy=(Xoff-0.01+0.163,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
+				fig.axes[0].annotate(r"$\sigma_{\rm{Rel}} = %s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]),xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			else:
 				#Quantiles
 				if imode>0.5*(len(self.sigRs)-1):#If peaks at RHS
@@ -798,21 +807,24 @@ class siblings_galaxy:
 				fig.axes[0].annotate(str(int(68))+str("%"),xy=(sigma_68,self.posterior[index68]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
 				fig.axes[0].annotate(str(int(95))+str("%"),xy=(sigma_95,self.posterior[index95]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
 				#Continue Annotations
-				fig.axes[0].annotate("%s %s"%(r'$\sigma_{\rm{Rel}}$',lg),       xy=(Xoff-0.01    ,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
-				fig.axes[0].annotate("{:.3f}".format(sigma_68),  xy=(Xoff+dX+0.02,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='right')
-				fig.axes[0].annotate("({:.3f})".format(sigma_95),xy=(Xoff+dX+0.0313,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
+				s68 = "{:.3f}".format(sigma_68) ; s95 = "({:.3f})".format(sigma_95)
+				fig.axes[0].annotate("%s %s %s %s"%(r'$\sigma_{\rm{Rel}}$',lg, s68, s95),xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			Yoff +=  0.275001
 
 		fig.axes[0].set_yticks([])
 		YMIN,YMAX = list(pl.gca().get_ylim())[:]
-		pl.gca().set_xlim([0,xupperlim])
+		if xupperlim!='adaptive':
+			pl.gca().set_xlim([0,xupperlim])
+			fig.axes[0].set_xticks(np.arange(0,0.25,0.05))
+		else:
+			qmin,qmax = min(list(XQs.keys())),max(list(XQs.keys()))
+			DX = max(XQs[qmax]) - min(XQs[qmin]) ; fac = 0.1
+			pl.gca().set_xlim([max([0,min(XQs[qmin])-DX*fac]),max(XQs[qmax])+DX*2*fac])
 		fig.axes[0].set_ylim([0,YMAX])
-		fig.text(0, 0.5, 'X', rotation=90, va='center', ha='center',color='white',fontsize=100)
-		fig.text(-0.06, 0.5, 'Posterior Density', rotation=90, va='center', ha='center',color='black',fontsize=self.FS)
-		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$ (mag)',fontsize=self.FS)
+		fig.axes[0].set_ylabel(r'Posterior Density',fontsize=self.FS)
+		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$ (mag)',fontsize=self.FS)#fig.text(0, 0.5, 'X', rotation=90, va='center', ha='center',color='white',fontsize=100)#fig.text(-0.06, 0.5, 'Posterior Density', rotation=90, va='center', ha='center',color='black',fontsize=self.FS)
 		pl.tick_params(labelsize=self.FS)
 		pl.tight_layout()
-		fig.axes[0].set_xticks(np.arange(0,0.25,0.05))
 		if self.save:
 			pl.savefig(f"{self.plotpath}{self.galname}_SigmaRelPosteriors.pdf",bbox_inches="tight")
 		if self.show:
