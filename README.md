@@ -15,7 +15,7 @@ For a single-galaxy analysis, sigmaRel_computer uses the `siblings_galaxy` class
   3) Compute analytic posteriors on $\sigma_{\rm{Rel}}$ for different choices of prior upper bound.
 
 ### Multi-galaxy Analysis
-To perform a multi-galaxt siblings analysis, sigmaRel_computer uses the `multi_galaxy` class, which can be used to:
+To perform a multi-galaxy siblings analysis, sigmaRel_computer uses the `multi_galaxy` class, which can be used to:
   1) Compute a cosmology-independent $\sigma_{\rm{Rel}}$ posterior, and plot the samples
   2) Additionally fit for $\sigma_0$, using external distance constraints
   3) Additionally fit for $\sigma_{\rm{pec}}$, also using external distance constraints
