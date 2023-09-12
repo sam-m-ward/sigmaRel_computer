@@ -1,5 +1,5 @@
 # sigmaRel_computer
-Repo for Hierarchical Analysis of Siblings Distance Estimates
+Repo for Hierarchically Analysing Siblings Distance Estimates
 ---
 ![Logo](logo/SigmaRelCartoon.png)
 ---
