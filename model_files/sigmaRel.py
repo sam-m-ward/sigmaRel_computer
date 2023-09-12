@@ -11,6 +11,7 @@ multi_galaxy class:
 	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'
 
 	Methods are:
+		create_paths()
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True)
@@ -22,6 +23,7 @@ siblings_galaxy class:
 	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,fontsize=18,show=False,save=True
 
 	Methods are:
+		create_paths()
 		get_sigmaRel_posterior(prior_distribution='uniform', prior_upper_bound = 1.0)
 		get_sigmaRel_posteriors()
 		get_CDF()
@@ -45,6 +47,23 @@ from model_loader_script import *
 from plotting_script import *
 
 class multi_galaxy_siblings:
+
+	def create_paths(self):
+		"""
+		Create Paths
+
+		Creates new folders if they don't already exist
+
+		End Product(s)
+		----------
+		os.mkdir(self.path)
+		"""
+		for path in [self.productpath,self.plotpath]:
+			minipaths = path.split('/')
+			for _ in range(len(minipaths)-2):
+				newpath = '/'.join(minipaths[:2+_]) + '/'
+				if not os.path.exists(newpath):
+					os.mkdir(newpath)
 
 	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'):
 		"""
@@ -91,6 +110,7 @@ class multi_galaxy_siblings:
 		self.stanpath    = self.modelpath + 'stan_files/MultiGalFiles/'
 		self.productpath = self.rootpath  + 'products/multigal/'
 		self.plotpath    = self.rootpath  + 'plots/multi_galaxy_plots/'
+		self.create_paths()
 
 		#Posterior Configuration
 		self.n_warmup   = 1000
@@ -399,6 +419,23 @@ class multi_galaxy_siblings:
 
 class siblings_galaxy:
 
+	def create_paths(self):
+		"""
+		Create Paths
+
+		Creates new folders if they don't already exist
+
+		End Product(s)
+		----------
+		os.mkdir(self.path)
+		"""
+		for path in [self.productpath,self.plotpath]:
+			minipaths = path.split('/')
+			for _ in range(len(minipaths)-2):
+				newpath = '/'.join(minipaths[:2+_]) + '/'
+				if not os.path.exists(newpath):
+					os.mkdir(newpath)
+
 	def __init__(self,mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,rootpath='./',fontsize=18,show=False,save=True):
 		"""
 		Initialisation
@@ -461,6 +498,7 @@ class siblings_galaxy:
 		self.stanpath    = self.modelpath + 'stan_files/'
 		self.productpath = self.rootpath  + 'products/'
 		self.plotpath    = self.rootpath  + 'plots/single_galaxy_plots/'
+		self.create_paths()
 
 	def get_sigmaRel_posterior(self, prior_distribution='uniform', prior_upper_bound = 1.0):
 		"""
