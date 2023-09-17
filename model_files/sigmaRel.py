@@ -1,9 +1,9 @@
 """
 Sigma_Rel Model
 
-Module containing siblings_galaxy class
-Operations for plotting individual siblings distances, computing sigma-rel posteriors, and combining distance estimates
-
+Module containing multi_galaxy class and siblings_galaxy class
+multi_galaxy class takes individual siblings distance estimates and performs multi-galaxy analysis
+siblings_galaxy class same as multi_galaxy class but just for a single siblings galaxy
 
 Contains:
 --------------------
