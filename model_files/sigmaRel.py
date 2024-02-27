@@ -8,7 +8,7 @@ siblings_galaxy class same as multi_galaxy class but just for a single siblings 
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'
+	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18
 
 	Methods are:
 		create_paths()
@@ -18,6 +18,8 @@ multi_galaxy class:
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False):
 		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],show=False,save=True)
 		loop_single_galaxy_analyses()
+		get_dxgs(Sg,ss,g_or_z)
+		plot_all_distances(colours=None, markers=None, g_or_z = 'g',show=False, save=True,markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,args_legend={'loc':'upper center','ncols':3})
 
 siblings_galaxy class:
 	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,fontsize=18,show=False,save=True
@@ -65,7 +67,7 @@ class multi_galaxy_siblings:
 				if not os.path.exists(newpath):
 					os.mkdir(newpath)
 
-	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./'):
+	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18):
 		"""
 		Initialisation
 
@@ -93,10 +95,15 @@ class multi_galaxy_siblings:
 
 		rootpath : str
 			path/to/sigmaRel/rootpath
+
+		FS : float (optional; default=18)
+			fontsize for plots
 		"""
 		#Data
 		self.dfmus      = dfmus
 		self.samplename = samplename
+		self.dfmus.sort_values('Galaxy',ascending=True,inplace=True)
+		print (self.dfmus)
 
 		#Model
 		self.sigma0                 = sigma0
@@ -119,6 +126,7 @@ class multi_galaxy_siblings:
 		self.n_thin     = 1000
 
 		#Other
+		self.FS = FS
 		self.c_light = 299792458
 
 	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances']):
@@ -415,6 +423,120 @@ class multi_galaxy_siblings:
 			sibgal.combine_individual_distances()
 			sibgal.plot_common_distances()
 
+	def get_dxgs(self,Sg,ss,g_or_z):
+		"""
+		Get dxgs
+
+		Simple method for SN labelling coordinates in the plot_all_distance method
+		If first SN, shift to left, if last SN shift to right, else, update with rule
+
+		Parameters
+		----------
+		Sg,ss : floats
+			number of SNe in galaxy, and 0-index of current sn
+
+		g_or_z : str
+			either g or z, for photometric or redshift mode
+		"""
+		if g_or_z == 'g':
+			dd = 0.1
+		else:
+			dd = None
+
+		if ss==0:
+			dx = -dd; ha='right'
+		elif ss==Sg-1:
+			dx = dd; ha='left'
+		else:
+			dx = dd; ha='left'
+		return dx, ha
+
+	def plot_all_distances(self, colours=None, markers=None, g_or_z = 'g',show=False, save=True,markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,args_legend={'loc':'upper center','ncols':3}):
+		"""
+		Plot All Distances
+
+		Method to plot up all photometric distances for all siblings galaxies. Can be used with or without external distance constraints (controlled by g_or_z)
+
+		Parameters
+		----------
+		colours: list of str (optional; default=None)
+			colours used for each Galaxy
+
+		markers: list of str (optional; default=None)
+			markers used for each Galaxy
+
+		g_or_z: str (optional; default='g')
+			defines whether to plot only photometric distances by GalaxyID ('g')
+			or to include redshift-based distances and plot by redshift
+
+		show, save: bools (optional; default=False,True)
+			whether to show/save plot
+
+		markersize,capsize,plot_full_errors,added_sigma0: float,float,bool,foat (optional;default=10,8,False,0.094)
+			size of markers and cap. Can include additional overlay where mu errors include a sigma0 term (default is 0.094~mag from W22), controlled by plot_full_errors bool
+
+		args_legend: dict (optional; default={'loc':'upper center','ncols':3})
+			legend arguments
+
+		End Product(s)
+		----------
+		Plot of siblings distance estimate across all siblings galaxies
+		"""
+		#Create plot
+		fig,ax = pl.subplots(1,1,figsize=(9.6,7.2),sharex='col',sharey=False,squeeze=False)
+		fig.axes[0].set_title(r"Individual Siblings Distance Estimates",weight='bold',fontsize=self.FS+1)
+
+		#Get colours markers
+		Ng = self.dfmus['Galaxy'].unique()
+		if colours is None:
+			colours = [f'C{s%10}' for s in range(self.dfmus['Galaxy'].nunique())]
+		if markers is None:
+			markers = ['o','s','p','^','x','P','d','*']
+			markers = [markers[int(ig%len(markers))] for ig in range(Ng.shape[0])]
+
+		#Define xgrid depending on whether mode is photometric distances only or additionally include redshift distances
+		if g_or_z=='g':
+			x_coords = np.arange(Ng.shape[0])
+			mini_d=0.2
+		elif g_or_z=='z':
+			x_coords = self.dfmus.groupby('Galaxy',sort=False)['zcmb_hats'].agg('mean')
+			mini_d=0.025
+			print(x_coords)
+			err=1/0
+		else:
+			raise Exception(f"Require g_or_z in [g,z], but got {g_or_z}")
+
+		#For each galaxy, plot distances
+		for igal,gal in enumerate(Ng):
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
+			mus,muerrs,SNe,Sg = dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,dfgal.shape[0]
+			fullerrors = np.array([added_sigma0**2 + err**2 for err in muerrs])**0.5
+			xgs  = [mini_d*(ss-(Sg-1)/2) for ss in range(Sg)] + x_coords[igal]
+			mubar = np.average(mus) if g_or_z=='g' else None
+			#For each SN
+			for mu,err,fullerr,ss in zip(mus,muerrs,fullerrors,np.arange(Sg)):
+				fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=err,     color=colours[igal],marker=markers[igal],markersize=markersize,              linestyle='none',capsize=capsize, label=gal*(ss==0))
+				if plot_full_errors:
+					fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=fullerr, color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
+				fig.axes[0].set_xticklabels("")
+				dd,ha = self.get_dxgs(Sg,ss,g_or_z)#For SN labelling
+				fig.axes[0].annotate(SNe[ss][2:],xy=(xgs[ss]+dd,mu-mubar),weight='bold',fontsize=self.FS-4,ha=ha)
+
+		#Plot aesthetics depend on g_or_z mode
+		if g_or_z=='g':
+			fig.axes[0].set_xticks(x_coords)
+			fig.axes[0].set_xticklabels(Ng)
+			fig.axes[0].set_xlabel("GalaxyID",fontsize=self.FS)
+			fig.axes[0].set_ylabel(r"$\hat{\mu} - \overline{\hat{\mu}}$ (mag)",fontsize=self.FS)
+		if g_or_z=='z':
+			fig.axes[0].legend(fontsize=self.FS,title='GalaxyID', **args_legend)
+		fig.axes[0].tick_params(labelsize=self.FS-2)
+		fig.axes[0].plot(pl.gca().get_xlim(),[0,0],c='black',linewidth=1)
+		pl.tight_layout()
+		if save:
+			pl.savefig(f"{self.plotpath}AllDistances_{g_or_z}.pdf", bbox_inches="tight")
+		if show:
+			pl.show()
 
 
 class siblings_galaxy:
