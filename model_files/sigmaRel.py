@@ -8,7 +8,7 @@ siblings_galaxy class same as multi_galaxy class but just for a single siblings 
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18
+	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True
 
 	Methods are:
 		create_paths()
@@ -67,7 +67,7 @@ class multi_galaxy_siblings:
 				if not os.path.exists(newpath):
 					os.mkdir(newpath)
 
-	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18):
+	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True):
 		"""
 		Initialisation
 
@@ -98,12 +98,14 @@ class multi_galaxy_siblings:
 
 		FS : float (optional; default=18)
 			fontsize for plots
+
+		verbose: bool (optional; default=True)
+			if True, print input dataframe
 		"""
 		#Data
 		self.dfmus      = dfmus
 		self.samplename = samplename
 		self.dfmus.sort_values('Galaxy',ascending=True,inplace=True)
-		print (self.dfmus)
 
 		#Model
 		self.sigma0                 = sigma0
@@ -128,6 +130,9 @@ class multi_galaxy_siblings:
 		#Other
 		self.FS = FS
 		self.c_light = 299792458
+		self.verbose = verbose
+		if self.verbose:
+			print (self.dfmus)
 
 	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances']):
 		"""
@@ -388,17 +393,17 @@ class multi_galaxy_siblings:
 					total_posteriors[p] *= 1/p#Prior only appears once
 					sigRs_store[p] = sibgal.sigRs_store[p]
 
-		#Use single-galaxy class for plotting
-		for p in self.prior_upper_bounds:
-			sibgal.posteriors[p]  = total_posteriors[p]
-			sibgal.sigRs_store[p] = sigRs_store[p]
-
 		#Plot posteriors
-		sibgal.show     = show
-		sibgal.save     = save
-		sibgal.galname  = self.samplename
-		sibgal.plotpath = self.plotpath
-		sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive')
+		if self.verbose:
+			#Use single-galaxy class for plotting
+			for p in self.prior_upper_bounds:
+				sibgal.posteriors[p]  = total_posteriors[p]
+				sibgal.sigRs_store[p] = sigRs_store[p]
+			sibgal.show     = show
+			sibgal.save     = save
+			sibgal.galname  = self.samplename
+			sibgal.plotpath = self.plotpath
+			sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive')
 
 		#Store posteriors as attribute
 		self.total_posteriors = total_posteriors
@@ -643,7 +648,7 @@ class siblings_galaxy:
 		"""
 		def Gaussian(x,mu,sig):
 			num = np.exp( -0.5*( ((x-mu)/sig)**2 ) )
-			den = (2*np.pi*sig**2)**0.5
+			den = (2*np.pi*(sig**2))**0.5
 			return num/den
 
 		#Check prior distribution is correct
