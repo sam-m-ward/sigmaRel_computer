@@ -559,6 +559,9 @@ class PARAMETER:
 				dec_places = len(summary.split('.')[1]) if '.' in summary else 0
 				pl.annotate(summary,   xy=(0.65 ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')
 				pl.annotate("$\pm$ %s"%round(self.samp_std,dec_places),xy=(0.665,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
+				#Summary_Str = "$%s\pm%s$"%(round(self.samp_median,2),round(self.samp_std,2))
+				Summary_Str = f'${self.samp_median:.2f}\pm{self.samp_std:.2f}$'
+				print (Summary_Str)
 			elif paperstyle:
 				if parname=='sigmapec':
 					summary = [int(round(x,0)) for x in [self.samp_median, self.dfchain.par.quantile(0.84)-self.samp_median,self.samp_median-self.dfchain.par.quantile(0.16)]]
@@ -601,8 +604,8 @@ class PARAMETER:
 
 			if paperstyle:
 				ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
-				Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
-				print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
+			Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
+			print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
 		ax[row,row].set_ylim([0,None])
 		return Summary_Str
