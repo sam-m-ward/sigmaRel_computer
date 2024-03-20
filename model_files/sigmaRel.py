@@ -12,6 +12,8 @@ multi_galaxy class:
 
 	Methods are:
 		create_paths()
+		infer_pars()
+		print_table(PARS=['mu','AV','theta','RV'],returner=False)
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True)
@@ -67,6 +69,62 @@ class multi_galaxy_siblings:
 				if not os.path.exists(newpath):
 					os.mkdir(newpath)
 
+	def infer_pars(self):
+		"""
+		Simple Method to infer parameters from input dfmus
+
+		End Product(s)
+		----------
+		self.parcols = ['mus','mu_errs','AVs','AV_errs'...]
+		"""
+		cols = list(self.dfmus.columns)
+		pars = [cc.split('_errs')[0] for cc in cols if '_errs' in cc and f"{cc.split('_errs')[0]}s" in cols]
+		self.parcols = [cc+{0:'s',1:'_errs'}[_] for cc in pars for _ in range(2)]
+
+	def print_table(self, PARS=['mu','AV','theta','RV'],returner=False):
+		"""
+		Print Tables
+
+		Method to take posterior chains and print summaries
+
+		Parameters
+		----------
+		PARS: list (optional; default=['mu','AV','theta','RV'])
+			total list that is then trimmed to match that in dfmus
+
+		returner: bool (optional; default=False)
+			if True, return list of summaries
+
+		End Product(s)
+		----------
+		Prints out string
+		"""
+		parnames   = ['mu','AV','theta','RV']
+		pars       = [p for p in PARS if f'{p}s' in self.parcols]
+		samp_cols  = [f'{p}_samps' for p in pars]
+		assert(samp_cols!=[])
+
+		keep        = [i for i,p in enumerate(parnames) if p in pars]
+		parlabels   = [x for i,x in enumerate(['$\\mu$ (mag)','$A_V$ (mag)','$\\theta$','$\\R_V$']) if i in keep]
+		bounds      = [x for i,x in enumerate([[None,None],[0,None],[None,None],[None,None]])       if i in keep]
+
+
+		plotting_parameters = {'FS':self.FS,'paperstyle':False,'quick':True,'save':False,'show':False}
+		lines = [] ; old_g = self.dfmus['Galaxy'].iloc[0]
+		for sn in self.dfmus.index:
+			if self.dfmus['Galaxy'].loc[sn]!=old_g:
+				lines.append('\midrule')
+				old_g = self.dfmus['Galaxy'].loc[sn]
+			samples = {par:self.dfmus[samp_col].loc[sn] for par,samp_col in zip(pars,samp_cols)}
+			Rhats   = {par:self.dfmus[f'{par}_Rhats'].loc[sn] for par in pars}
+			postplot = POSTERIOR_PLOTTER(samples, pars, parlabels, bounds, Rhats, plotting_parameters)
+			Summary_Strs = postplot.corner_plot()#Table Summary
+			line = self.dfmus['SN'].loc[sn] + ' & ' + self.dfmus['Galaxy'].loc[sn].astype(str) +' & ' + ' & '.join(list(Summary_Strs.values())) + ' \\\\ '
+			lines.append(line)
+		print ('\n'.join(lines))
+		if returner: return lines
+
+
 	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True):
 		"""
 		Initialisation
@@ -106,6 +164,7 @@ class multi_galaxy_siblings:
 		self.dfmus      = dfmus
 		self.samplename = samplename
 		self.dfmus.sort_values('Galaxy',ascending=True,inplace=True)
+		self.infer_pars()
 
 		#Model
 		self.sigma0                 = sigma0
@@ -132,7 +191,7 @@ class multi_galaxy_siblings:
 		self.c_light = 299792458
 		self.verbose = verbose
 		if self.verbose:
-			print (self.dfmus)
+			print (self.dfmus[self.parcols])
 
 	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances']):
 		"""
