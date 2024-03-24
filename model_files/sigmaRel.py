@@ -18,7 +18,7 @@ multi_galaxy class:
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True)
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False):
-		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],show=False,save=True)
+		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],show=False,save=True,blind=False)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
 		plot_all_distances(colours=None, markers=None, g_or_z = 'g',show=False, save=True,markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,args_legend={'loc':'upper center','ncols':3})
@@ -409,7 +409,7 @@ class multi_galaxy_siblings:
 
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self,prior_upper_bounds=[1.0],show=False,save=True):
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,prior_upper_bounds=[1.0],show=False,save=True,blind=False):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
@@ -425,6 +425,9 @@ class multi_galaxy_siblings:
 
 		save : bool (optional; default=True)
 			bool to save plots or not
+
+		blind : bool (optional; default=False)
+			if True, blind sigmaRel plot axes and posterior summaries
 
 		End Product(s)
 		----------
@@ -462,7 +465,7 @@ class multi_galaxy_siblings:
 			sibgal.save     = save
 			sibgal.galname  = self.samplename
 			sibgal.plotpath = self.plotpath
-			sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive')
+			sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive',blind=blind)
 
 		#Store posteriors as attribute
 		self.total_posteriors = total_posteriors
@@ -953,7 +956,7 @@ class siblings_galaxy:
 		if self.show:
 			pl.show()
 
-	def plot_sigmaRel_posteriors(self,xupperlim=0.25,colours=None):
+	def plot_sigmaRel_posteriors(self,xupperlim=0.25,colours=None,blind=False):
 		"""
 		Plot Sigma_Rel Posteriors
 
@@ -966,6 +969,9 @@ class siblings_galaxy:
 
 		colours : lst (optional; default=None)
 			colours for each sigmaRel overlay, defaults to ['green','purple','goldenrod']
+
+		blind : bool (optional; default=False)
+			if True, blind sigmaRel plot axes and posterior summaries
 
 		Returns
 		----------
@@ -1010,6 +1016,7 @@ class siblings_galaxy:
 				index84 += 1
 				fig.axes[0].fill_between(self.sigRs[index16:index84],np.zeros(index84-index16),KDE[index16:index84],color=ccc,alpha=alph)
 				summary = ["{:.3f}".format(x) for x in [self.sigRs[index50],self.sigRs[index84-1]-self.sigRs[index50],self.sigRs[index50]-self.sigRs[index16]] ]
+				if blind: summary = ['0.X','0.X','0.X']
 				fig.axes[0].annotate(r"$\sigma_{\rm{Rel}} = %s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]),xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			else:
 				#Quantiles
@@ -1032,6 +1039,7 @@ class siblings_galaxy:
 				fig.axes[0].annotate(str(int(95))+str("%"),xy=(sigma_95,self.posterior[index95]+0.04*(self.posterior[0]-self.posterior[-1])), color=ccc,fontsize=self.FS-4,weight='bold',ha='left')
 				#Continue Annotations
 				s68 = "{:.3f}".format(sigma_68) ; s95 = "({:.3f})".format(sigma_95)
+				if blind:	s68,s95 = '0.X','(0.X)'
 				fig.axes[0].annotate("%s %s %s %s"%(r'$\sigma_{\rm{Rel}}$',lg, s68, s95),xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			Yoff +=  0.275001
 
@@ -1044,6 +1052,7 @@ class siblings_galaxy:
 			qmin,qmax = min(list(XQs.keys())),max(list(XQs.keys()))
 			DX = max(XQs[qmax]) - min(XQs[qmin]) ; fac = 0.1
 			pl.gca().set_xlim([max([0,min(XQs[qmin])-DX*fac]),max(XQs[qmax])+DX*2*fac])
+		if blind:	fig.axes[0].set_xticks([])
 		fig.axes[0].set_ylim([0,YMAX])
 		fig.axes[0].set_ylabel(r'Posterior Density',fontsize=self.FS)
 		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$ (mag)',fontsize=self.FS)#fig.text(0, 0.5, 'X', rotation=90, va='center', ha='center',color='white',fontsize=100)#fig.text(-0.06, 0.5, 'Posterior Density', rotation=90, va='center', ha='center',color='black',fontsize=self.FS)
