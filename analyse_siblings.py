@@ -3,25 +3,72 @@ import sys
 rootpath = './'
 sys.path.append(rootpath+'model_files/')
 from sigmaRel import *
-from simulate_distances import *
-
+#from simulate_distances import *
 #simulator = SiblingsDistanceSimulator(Ng=100,Sg=3,external_distances=True)
 #dfmus     = simulator.dfmus
-#print (dfmus)
-#multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True)
-##multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[0.1,0.15,1.0])
-#multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True)
-#multigal.plot_posterior_samples()
-#'''
-data = {    'Galaxy':['1316','1316','1316','3190','3190','5018','5018','1404','1404','MCG22427','MCG22427','1575','1575'],
-            'SN':['1980N','1981D','2006dd','2002bo','2002cv','2002dj','2021fxy','2007on','2011iv','2011at','2020jgl','2020sjo','2020zhh'],
-            #'mus':[31.753,31.759,31.466,32.408,33.155,33.187,32.978,32.043,31.343,32.813,32.669,35.780,35.596],
-            #'mu_errs':[0.027,0.028,0.022,0.047,0.024,0.019,0.026,0.010,0.017,0.024,0.030,0.022,0.056]
-            'mus':[31.387,31.389,31.201,32.186,31.902,33.148,32.977,31.502,31.207,32.724,32.676,35.830,35.552],
-            'mu_errs':[0.080,0.073,0.044,0.124,0.022,0.044,0.031,0.032,0.053,0.0062,0.032,0.038,0.094]
+
+
+#LOAD IN CHAINS
+from glob import glob
+chains_path = '../../bayesn_for_ztf/bayesn-pre-release-dev/ZTFtest3/ZTFtest3_Samples/'
+#chains_path = '../../bayesn_for_ztf/bayesn-pre-release-dev/ZTFtest3_freeRV/ZTFtest3_freeRV_Samples/'
+files = glob(chains_path+'*.npy')
+snes  = {ff.split(chains_path)[1].split('_ZTF_DR2.snana_chains.npy')[0]:ff for ff in files}
+dfmus = {'sn':[]} ; PARS = ['mu','AV','theta']
+for sn,ff in snes.items():
+    dfmus['sn'].append(sn)
+    for PAR in PARS:
+        if PAR not in dfmus.keys():
+            dfmus[PAR], dfmus[PAR+'_errs'], dfmus[PAR+'_samps'] = [],[],[]
+        x = np.load(ff,allow_pickle=True).item()
+        if PAR=='mu':   dfmus[f'{PAR}_samps'].append(x[PAR]+x['delM'])
+        else:           dfmus[f'{PAR}_samps'].append(x[PAR])
+        dfmus[PAR].append(np.median(dfmus[f'{PAR}_samps'][-1]))
+        dfmus[f'{PAR}_errs'].append(np.std(dfmus[f'{PAR}_samps'][-1]))
+dfmus = pd.DataFrame(dfmus)
+dfmus.set_index('sn',inplace=True)
+
+#LOAD IN SUMMARIES
+files = glob(chains_path+'*.pkl')
+snes  = {ff.split(chains_path)[1].split('_ZTF_DR2.snana_summary.pkl')[0]:ff for ff in files}
+Rhats = {}
+Rhat_cols = [f'{PAR}_Rhats' for PAR in PARS]
+for sn,ff in snes.items():
+    with open(ff,'rb') as f:
+        summary = pickle.load(f)
+    dfmus.loc[sn,Rhat_cols] = summary.loc[PARS]['R_hat'].values
+
+#LOAD IN SNE TO MAP TO GALAXY
+sng = '../../bayesn_for_ztf/bayesn-pre-release-dev/bayesn-data/lcs/meta/ztf_dr2_siblings_redshifts.txt'
+sng = pd.read_csv(sng,names=['sn','z'],sep='\s')
+sn_to_g = {sn:1+isn//2 for isn,sn in enumerate(sng.sn)}
+
+
+#COMBINE CHAINS AND SIBS GALAXIES
+dfmus = dfmus.loc[sn_to_g.keys()]
+dfmus['Galaxy'] = list(sn_to_g.values())
+data = {
+    'Galaxy':list(sn_to_g.values()),
+    'SN':list(sn_to_g.keys()),
 }
+for PAR in ['mu','AV','theta']:
+    data[f'{PAR}s']      = [dfmus[PAR].loc[sn] for sn in sn_to_g]
+    data[f'{PAR}_errs']  = [dfmus[f'{PAR}_errs'].loc[sn] for sn in sn_to_g]
+    data[f'{PAR}_samps'] = [dfmus[f'{PAR}_samps'].loc[sn] for sn in sn_to_g]
+    data[f'{PAR}_Rhats'] = [dfmus[f'{PAR}_Rhats'].loc[sn] for sn in sn_to_g]
+
 dfmus = pd.DataFrame(data=data)
+print (dfmus.columns)
+
+#APPLY FILTERING
+#dfmus = dfmus[~dfmus['Galaxy'].isin([10,11])]
+#dfmus = dfmus[~dfmus['Galaxy'].isin([3,5,10,11])]
+#dfmus = dfmus[~dfmus['Galaxy'].isin([5,10,11])]
+#dfmus = dfmus[~dfmus['Galaxy'].isin([2,5,10,11])]
+
+#ANALYSE
 multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True)
-multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0])
-multigal.plot_all_distances()
+#multigal.print_table()
+multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],blind=True)
+multigal.plot_parameters(['mu','AV','theta'])
 #'''
