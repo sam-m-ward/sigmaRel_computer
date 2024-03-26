@@ -18,7 +18,7 @@ POSTERIOR_PLOTTER class:
 	Methods are:
 		update_lims(Nsig=3)
 		corner(fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15)
-		corner_plot()
+		corner_plot(verbose=True)
 
 PARAMETER class:
 	inputs: chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None
@@ -28,7 +28,7 @@ PARAMETER class:
 		slice_reflection_KDE()
 		get_xgrid_KDE()
 		get_KDE_values(location=None,value=None, return_only_index=False)
-		plot_marginal_posterior(ax,colour='C0',alph=0.2,FS=14)
+		plot_marginal_posterior(ax,colour='C0',alph=0.2,FS=14,verbose=True)
 --------------------
 Mostly Copied from Bird-Snack (https://github.com/sam-m-ward/birdsnack)
 Written by Sam M. Ward: smw92@cam.ac.uk
@@ -308,11 +308,17 @@ class POSTERIOR_PLOTTER:
 		self.fig = fig
 		self.ax  = ax
 
-	def corner_plot(self):
+	def corner_plot(self,verbose=True):
 		"""
 		Plot posterior samples
 
 		Function to plot the posterior samples
+
+		Parameters
+		----------
+		verbose: bool (optional; default=True)
+			print out summaries
+
 
 		End Product(s)
 		----------
@@ -329,17 +335,17 @@ class POSTERIOR_PLOTTER:
 		fig,ax = pl.subplots(len(pardict),len(pardict),figsize=(sfigx,sfigy),sharex='col',sharey=False)
 		if len(pardict)==1:	ax = np.array([[ax]])
 
-		print ("###"*5)
+		if verbose: print ("###"*5)
 		Summary_Strs = {}
 		for row,parname in enumerate(self.pardict):#Get Conf Intervals Here
 			parameter = PARAMETER(self.chains[row],parname,self.pardict[parname],self.lims[row],self.bounds[row],self.Rhats[parname],row,self.choices,self.smoothing)
 			parameter.get_xgrid_KDE()
 			#Plot 1D Marginal KDEs
-			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax)
-			print ("###"*5)
+			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax,verbose=verbose)
+			if verbose: print ("###"*5)
 		#Plot 2D marginals
 		self.corner([fig,ax])
-		print ("Corner samples/contours plotted successfully")
+		if verbose: print ("Corner samples/contours plotted successfully")
 		return Summary_Strs
 
 class PARAMETER:
@@ -492,7 +498,7 @@ class PARAMETER:
 		else:
 			return grid_index, xgrid_loc, KDE_height
 
-	def plot_marginal_posterior(self,ax,colour='C0',alph=0.2,FS=14):
+	def plot_marginal_posterior(self,ax,colour='C0',alph=0.2,FS=14,verbose=True):
 		"""
 		Plot Marginal Posterior
 
@@ -511,6 +517,9 @@ class PARAMETER:
 
 		FS : float
 			fontsize
+
+		verbose: bool (optional; default=True)
+			if True print summaries
 		Returns
 		----------
 		Summary_Str : str
@@ -541,9 +550,9 @@ class PARAMETER:
 		condition2 = not (KDE[0]>=hh*KDEmode or KDE[-1]>=hh*KDEmode)
 
 		#If typical Gaussian-like posterior, plot median, 16 and 84th percentiles
-		print (f"5%, 50%, 68%, 95% quantiles: {round(self.dfchain.par.quantile(0.05),2)}, {round(self.dfchain.par.quantile(0.5),2)}, {round(self.dfchain.par.quantile(0.68),2)},{round(self.dfchain.par.quantile(0.95),2)}")
+		if verbose: print (f"5%, 50%, 68%, 95% quantiles: {round(self.dfchain.par.quantile(0.05),2)}, {round(self.dfchain.par.quantile(0.5),2)}, {round(self.dfchain.par.quantile(0.68),2)},{round(self.dfchain.par.quantile(0.95),2)}")
 		if condition1 and condition2:
-			print (f"{parname}: {round(self.samp_median,2)} +/- {round(self.samp_std,2)}; 16th and 84th intervals: -{round(self.dfchain.par.quantile(0.5)-self.dfchain.par.quantile(0.16),2)}+{round(self.dfchain.par.quantile(0.84)-self.dfchain.par.quantile(0.5),2)}")
+			if verbose: print (f"{parname}: {round(self.samp_median,2)} +/- {round(self.samp_std,2)}; 16th and 84th intervals: -{round(self.dfchain.par.quantile(0.5)-self.dfchain.par.quantile(0.16),2)}+{round(self.dfchain.par.quantile(0.84)-self.dfchain.par.quantile(0.5),2)}")
 			#Plot median and 16th 84th quantiles
 			i_med, x_med, KDE_med = self.get_KDE_values(value=self.samp_median)
 			ax[row,row].plot(np.ones(2)*x_med,[0,KDE_med],c=colour)
@@ -561,7 +570,7 @@ class PARAMETER:
 				pl.annotate("$\pm$ %s"%round(self.samp_std,dec_places),xy=(0.665,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
 				#Summary_Str = "$%s\pm%s$"%(round(self.samp_median,2),round(self.samp_std,2))
 				Summary_Str = f'${self.samp_median:.2f}\pm{self.samp_std:.2f}$'
-				print (Summary_Str)
+				if verbose: print (Summary_Str)
 			elif paperstyle:
 				if parname=='sigmapec':
 					summary = [int(round(x,0)) for x in [self.samp_median, self.dfchain.par.quantile(0.84)-self.samp_median,self.samp_median-self.dfchain.par.quantile(0.16)]]
@@ -605,7 +614,7 @@ class PARAMETER:
 			if paperstyle:
 				ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
 			Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
-			print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
+			if verbose: print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
 		ax[row,row].set_ylim([0,None])
 		return Summary_Str
