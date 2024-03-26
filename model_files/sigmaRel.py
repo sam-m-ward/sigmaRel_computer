@@ -13,7 +13,7 @@ multi_galaxy class:
 	Methods are:
 		create_paths()
 		infer_pars()
-		print_table(PARS=['mu','AV','theta','RV'],returner=False)
+		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, overwrite=True)
@@ -21,7 +21,8 @@ multi_galaxy class:
 		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],show=False,save=True,blind=False)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
-		plot_all_distances(colours=None, markers=None, g_or_z = 'g',show=False, save=True,markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,args_legend={'loc':'upper center','ncols':3})
+		plot_parameters(PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,show=False, save=True,markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,text_index = 3, annotate_mode = 'legend',args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
+
 
 siblings_galaxy class:
 	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,fontsize=18,show=False,save=True
@@ -35,7 +36,7 @@ siblings_galaxy class:
 		get_weighted_mu()
 		combine_individual_distances(mode=None,overwrite=True)
 		plot_individual_distances(colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025,plot_full_errors=True)
-		plot_sigmaRel_posteriors(xupperlim=0.16,colours = ['green','purple','goldenrod'])
+		plot_sigmaRel_posteriors(xupperlim=0.16,colours = ['green','purple','goldenrod'], blind=False)
 		plot_common_distances(markersize=10,capsize=8,mini_d=0.025)
 --------------------
 
@@ -81,7 +82,7 @@ class multi_galaxy_siblings:
 		pars = [cc.split('_errs')[0] for cc in cols if '_errs' in cc and f"{cc.split('_errs')[0]}s" in cols]
 		self.parcols = [cc+{0:'s',1:'_errs'}[_] for cc in pars for _ in range(2)]
 
-	def print_table(self, PARS=['mu','AV','theta','RV'],returner=False):
+	def print_table(self, PARS=['mu','AV','theta','RV'],verbose=False,returner=False):
 		"""
 		Print Tables
 
@@ -92,6 +93,9 @@ class multi_galaxy_siblings:
 		PARS: list (optional; default=['mu','AV','theta','RV'])
 			total list that is then trimmed to match that in dfmus
 
+		verbose : bool (optional; default=False)
+			option to print out summaries for each plot
+
 		returner: bool (optional; default=False)
 			if True, return list of summaries
 
@@ -99,14 +103,14 @@ class multi_galaxy_siblings:
 		----------
 		Prints out string
 		"""
-		parnames   = ['mu','AV','theta','RV']
+		PARS       = [p for p in ['mu','AV','theta','RV'] if p in PARS]
 		pars       = [p for p in PARS if f'{p}s' in self.parcols]
 		samp_cols  = [f'{p}_samps' for p in pars]
 		assert(samp_cols!=[])
 
-		keep        = [i for i,p in enumerate(parnames) if p in pars]
-		parlabels   = [x for i,x in enumerate(['$\\mu$ (mag)','$A_V$ (mag)','$\\theta$','$\\R_V$']) if i in keep]
-		bounds      = [x for i,x in enumerate([[None,None],[0,None],[None,None],[None,None]])       if i in keep]
+		keep        = [i for i,p in enumerate(self.master_parnames) if p in pars]
+		parlabels   = [x for i,x in enumerate(self.master_parlabels) if i in keep]
+		bounds      = [x for i,x in enumerate(self.master_bounds)    if i in keep]
 
 
 		plotting_parameters = {'FS':self.FS,'paperstyle':False,'quick':True,'save':False,'show':False}
@@ -118,11 +122,14 @@ class multi_galaxy_siblings:
 			samples = {par:self.dfmus[samp_col].loc[sn] for par,samp_col in zip(pars,samp_cols)}
 			Rhats   = {par:self.dfmus[f'{par}_Rhats'].loc[sn] for par in pars}
 			postplot = POSTERIOR_PLOTTER(samples, pars, parlabels, bounds, Rhats, plotting_parameters)
-			Summary_Strs = postplot.corner_plot()#Table Summary
+			Summary_Strs = postplot.corner_plot(verbose=verbose)#Table Summary
 			line = self.dfmus['SN'].loc[sn] + ' & ' + self.dfmus['Galaxy'].loc[sn].astype(str) +' & ' + ' & '.join(list(Summary_Strs.values())) + ' \\\\ '
 			lines.append(line)
-		print ('\n'.join(lines))
-		if returner: return lines
+		if returner:
+			return lines
+		else:
+			print ('\n'.join(lines))
+
 
 
 	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True):
@@ -165,6 +172,11 @@ class multi_galaxy_siblings:
 		self.samplename = samplename
 		self.dfmus.sort_values('Galaxy',ascending=True,inplace=True)
 		self.infer_pars()
+
+		#Input Posterior Parameters
+		self.master_parnames  = ['mu','AV','theta','RV']
+		self.master_parlabels = ['$\\mu$ (mag)','$A_V$ (mag)','$\\theta$','$\\R_V$']
+		self.master_bounds    = [[None,None],[0,None],[None,None],[None,None]]
 
 		#Model
 		self.sigma0                 = sigma0
@@ -518,7 +530,12 @@ class multi_galaxy_siblings:
 			dx = dd; ha='left'
 		return dx, ha
 
-	def plot_all_distances(self, colours=None, markers=None, g_or_z = 'g',show=False, save=True,markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,args_legend={'loc':'upper center','ncols':3}):
+
+	def plot_parameters(self, PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,
+							show=False, save=True,
+							markersize=10,capsize=8, plot_full_errors=False,added_sigma0=0.094,
+							text_index = 3, annotate_mode = 'legend',
+							args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}):
 		"""
 		Plot All Distances
 
@@ -526,6 +543,9 @@ class multi_galaxy_siblings:
 
 		Parameters
 		----------
+		PAR: str or list (optional; default='mu')
+			if str, plots parameter, if list, plots multiple parameters
+
 		colours: list of str (optional; default=None)
 			colours used for each Galaxy
 
@@ -536,11 +556,18 @@ class multi_galaxy_siblings:
 			defines whether to plot only photometric distances by GalaxyID ('g')
 			or to include redshift-based distances and plot by redshift
 
+		subtract_g_mean: None (optional; default=None)
+			if None, becomes True for PAR=='mu' or False for PAR=='theta','AV','RV'
+
 		show, save: bools (optional; default=False,True)
 			whether to show/save plot
 
 		markersize,capsize,plot_full_errors,added_sigma0: float,float,bool,foat (optional;default=10,8,False,0.094)
 			size of markers and cap. Can include additional overlay where mu errors include a sigma0 term (default is 0.094~mag from W22), controlled by plot_full_errors bool
+
+		text_index, annotate_mode: int, str (optional; default=3, 'legend' or 'text')
+			for example if 'ZTF18abcxyz', specifying 3 returns label '18abcxyz'
+			if legend annotate, put SN names in legend, otherwise, put SN name next to data points
 
 		args_legend: dict (optional; default={'loc':'upper center','ncols':3})
 			legend arguments
@@ -549,9 +576,30 @@ class multi_galaxy_siblings:
 		----------
 		Plot of siblings distance estimate across all siblings galaxies
 		"""
+		multiplot = False if type(PAR)==str else True
+		PARS = copy.deepcopy(PAR) if multiplot else [PAR]
+		if multiplot:
+			args_legend['loc'] = 'center left'
+			args_legend['bbox_to_anchor'] = (1,0.5)
+			args_legend['ncols'] = 1
+
+		if [pp for pp in ['AV','RV'] if pp in PARS]!=[]:#To get 68,95 intervals when required
+			PPARS = [PAR] if not multiplot else [pp for pp in ['AV','RV'] if pp in PARS]
+			lines = self.print_table(PARS=PPARS,returner=True)
+			lines = [ll.split('\\\\')[0] for ll in lines if ll!='\\midrule']
+			dfsummaries = pd.DataFrame([re.sub(r'\s+','',ll).split('&') for ll in lines],columns=['SN','GalaxyID']+PPARS)
+			dfsummaries[[f'{pp}bunched' for pp in PPARS]] = dfsummaries[PPARS].apply(lambda x: ['\pm' not in xi for xi in x],axis=1,result_type='expand')
+			for pp in PPARS:
+				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}68'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: x.split('(')[0].split('$')[1][1:])
+				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}95'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: x.split('(')[1].split(')')[0])
+				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}bunchindex'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: {'<':0,'>':1}[x[1]])
+
 		#Create plot
-		fig,ax = pl.subplots(1,1,figsize=(9.6,7.2),sharex='col',sharey=False,squeeze=False)
-		fig.axes[0].set_title(r"Individual Siblings Distance Estimates",weight='bold',fontsize=self.FS+1)
+		if multiplot:
+			fig,ax = pl.subplots(len(PARS),1,figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')),6*len(PARS)),sharex='col',sharey=False,squeeze=False)
+		else:
+			fig,ax = pl.subplots(1,1,figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')),7.2),sharex='col',sharey=False,squeeze=False)
+			iax=0
 
 		#Get colours markers
 		Ng = self.dfmus['Galaxy'].unique()
@@ -573,35 +621,78 @@ class multi_galaxy_siblings:
 		else:
 			raise Exception(f"Require g_or_z in [g,z], but got {g_or_z}")
 
-		#For each galaxy, plot distances
-		for igal,gal in enumerate(Ng):
-			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
-			mus,muerrs,SNe,Sg = dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,dfgal.shape[0]
-			fullerrors = np.array([added_sigma0**2 + err**2 for err in muerrs])**0.5
-			xgs  = [mini_d*(ss-(Sg-1)/2) for ss in range(Sg)] + x_coords[igal]
-			mubar = np.average(mus) if g_or_z=='g' else None
-			#For each SN
-			for mu,err,fullerr,ss in zip(mus,muerrs,fullerrors,np.arange(Sg)):
-				fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=err,     color=colours[igal],marker=markers[igal],markersize=markersize,              linestyle='none',capsize=capsize, label=gal*(ss==0))
-				if plot_full_errors:
-					fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=fullerr, color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
-				fig.axes[0].set_xticklabels("")
-				dd,ha = self.get_dxgs(Sg,ss,g_or_z)#For SN labelling
-				fig.axes[0].annotate(SNe[ss][2:],xy=(xgs[ss]+dd,mu-mubar),weight='bold',fontsize=self.FS-4,ha=ha)
+		for iax,PAR in enumerate(PARS):
+			subtract_mean = {'mu':True,'theta':False,'AV':False,'RV':False}[PAR] if subtract_g_mean is None else subtract_g_mean
+			if PAR=='mu':		ylabel = r"$\hat{\mu}_s - \overline{\hat{\mu}_s}$ (mag)" if subtract_mean else r"$\hat{\mu}_s$ (mag)"	;	pword = 'Distance'
+			if PAR=='AV':		ylabel = r"$\hat{A}^s_V - \overline{\hat{A}^s_V}$ (mag)" if subtract_mean else r"$\hat{A}^s_V$ (mag)"	;	pword = 'Dust Extinction'
+			if PAR=='RV':		ylabel = r"$\hat{R}^s_V - \overline{\hat{R}^s_V}$" 		 if subtract_mean else r"$\hat{R}^s_V$"			;	pword = 'Dust Law Shape'
+			if PAR=='theta':	ylabel = r"$\hat{\theta}_s - \overline{\hat{\theta}_s}$" if subtract_mean else r"$\hat{\theta}_s$"		;	pword = 'Light Curve Shape'
+
+			if iax==0:
+				fig.axes[0].set_title(f"Individual Siblings {pword if not multiplot else 'Parameter'} Estimates",weight='bold',fontsize=self.FS+1)
+
+			#For each galaxy, plot distances
+			for igal,gal in enumerate(Ng):
+				dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
+				mus,muerrs,SNe,Sg = dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,dfgal.shape[0]
+				if PAR=='mu':	fullerrors = np.array([added_sigma0**2 + err**2 for err in muerrs])**0.5
+				xgs  = [mini_d*(ss-(Sg-1)/2) for ss in range(Sg)] + x_coords[igal]
+				mubar = np.average(mus) if g_or_z=='g' else None
+				#For each SN
+				for mu,err,ss in zip(mus,muerrs,np.arange(Sg)):
+					#Choice of labelling for legend/SNe
+					if g_or_z=='g':		lab = '\n'.join([sn[text_index:] for sn in SNe])
+					elif g_or_z=='z':	lab = gal
+					lab = lab if ss==0 and annotate_mode=='legend' else None
+					#Plot points (with optional legend labels)
+					if PAR in ['AV','RV'] and dfsummaries[dfsummaries['SN']==SNe[ss]][f'{PAR}bunched'].values[0]:
+						bunchindex = int(dfsummaries[dfsummaries['SN']==SNe[ss]][f'{PAR}bunchindex'].values[0])
+						point = self.master_bounds[self.master_parnames.index(PAR)][bunchindex]
+						e68 = float(dfsummaries[dfsummaries['SN']==SNe[ss]][f'{PAR}68'].values[0])
+						fig.axes[iax].errorbar(xgs[ss],point-mubar*subtract_mean,yerr=[[e68*bunchindex],[e68*(1-bunchindex)]],     color=colours[igal],marker=markers[igal],markersize=markersize,          linestyle='none',capsize=capsize, label=lab)
+						#e95 = float(dfsummaries[dfsummaries['SN']==SNe[ss]][f'{PAR}95'].values[0])
+						#fig.axes[0].errorbar(xgs[ss],point-mubar*subtract_mean,yerr=[[e95*bunchindex],[e95*(1-bunchindex)]],     color=colours[igal],marker=markers[igal],markersize=0,          		  linestyle='none',capsize=capsize*0.5, elinewidth=0.25)
+					else:
+						fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=err,     color=colours[igal],marker=markers[igal],markersize=markersize,          linestyle='none',capsize=capsize, label=lab)
+
+					#Potential to add in distance errors with total intrinsic scatter
+					if plot_full_errors and PAR=='mu':	fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=fullerrors[ss], color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
+
+					fig.axes[iax].set_xticklabels("")
+					dd,ha = self.get_dxgs(Sg,ss,g_or_z)#For SN labelling
+					if annotate_mode=='text':
+						fig.axes[iax].annotate(SNe[ss][text_index:],xy=(xgs[ss]+dd,mu-mubar),weight='bold',fontsize=self.FS-4,ha=ha)
+
+			if PAR=='AV' and not subtract_mean:
+				fig.axes[iax].set_ylim([0,None])#pl.gca().get_ylim()[-1]])
+			if PAR=='theta' and not subtract_mean:
+				fig.axes[iax].plot([-1,len(Ng)],[-1.5,-1.5],c='black',linewidth=1,linestyle='--')
+				fig.axes[iax].plot([-1,len(Ng)],[2,2],c='black',linewidth=1,linestyle='--')
+			if g_or_z=='g':
+				fig.axes[iax].set_ylabel(ylabel,fontsize=self.FS)
+			fig.axes[iax].tick_params(labelsize=self.FS-2)
+			fig.axes[iax].plot([-1,len(Ng)],[0,0],c='black',linewidth=1)
 
 		#Plot aesthetics depend on g_or_z mode
 		if g_or_z=='g':
-			fig.axes[0].set_xticks(x_coords)
-			fig.axes[0].set_xticklabels(Ng)
-			fig.axes[0].set_xlabel("GalaxyID",fontsize=self.FS)
-			fig.axes[0].set_ylabel(r"$\hat{\mu} - \overline{\hat{\mu}}$ (mag)",fontsize=self.FS)
+			fig.axes[-1].set_xticks(x_coords)
+			fig.axes[-1].set_xticklabels(Ng)
+			fig.axes[-1].set_xlabel("GalaxyID",fontsize=self.FS)
+			if annotate_mode=='legend':
+				#If/else because latter is weird fig rescaling for single panel plot
+				if not multiplot:	fig.axes[0].legend(fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+				else:
+					lines, labels = fig.axes[-1].get_legend_handles_labels()
+					fig.legend(lines, labels, fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+
 		if g_or_z=='z':
-			fig.axes[0].legend(fontsize=self.FS,title='GalaxyID', **args_legend)
-		fig.axes[0].tick_params(labelsize=self.FS-2)
-		fig.axes[0].plot(pl.gca().get_xlim(),[0,0],c='black',linewidth=1)
+			fig.axes[-1].legend(fontsize=self.FS,title='GalaxyID', **args_legend)
+		fig.axes[-1].set_xlim([-1,len(Ng)])
+		#fig.subplots_adjust(top=0.9)
+		#fig.subplots_adjust(wspace=0, hspace=0)
 		pl.tight_layout()
 		if save:
-			pl.savefig(f"{self.plotpath}AllDistances_{g_or_z}.pdf", bbox_inches="tight")
+			pl.savefig(f"{self.plotpath}{PAR if not multiplot else 'Parameter'}s_{g_or_z}.pdf", bbox_inches="tight")
 		if show:
 			pl.show()
 
