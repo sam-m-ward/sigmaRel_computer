@@ -73,5 +73,9 @@ model {
 
 generated quantities {
   real<lower=0> sigmapec;
-  sigmapec = pec_unity*299792.458;
+  real<lower=0> sigmaCommon;
+  real<lower=0,upper=1> rho;
+  rho         = 1-square(sigmaRel)/square(sigma0);
+  sigmaCommon = sqrt(square(sigma0)-square(sigmaRel));
+  sigmapec    = pec_unity*299792.458;
 }
