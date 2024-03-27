@@ -10,7 +10,7 @@ Contains:
 Functions:
 	kde(x_data, x_target, y_data=None, y_target=None, x_bounds=None, y_bounds=None, smoothing=1.0)
 	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey)
-	get_Lines(stan_data, c_light)
+	get_Lines(stan_data, c_light, alt_prior)
 
 POSTERIOR_PLOTTER class:
 	inputs: samples, parnames, parlabels, bounds, Rhats, choices, smoothing=2
@@ -603,11 +603,11 @@ class PARAMETER:
 				ax[row,row].plot(np.ones(2)*x_conf,[0,KDE_conf],c=colour)
 				ax[row,row].fill_between(xgrid[irange[0]:irange[1]],np.zeros(irange[1]-irange[0]),KDE[irange[0]:irange[1]],color=colour,alpha=alph*(1-0.5*ic)*0.5)#half factor because gets doubled over
 				#For RHS Boundary
-				if irange[-1]==len(xgrid): ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf+(xgrid[-1]-xgrid[0])*0.1,KDE_conf+0.08*KDEmode),color=colour,fontsize=FS+1,weight='bold',ha='right')
+				if irange[-1]==len(xgrid): ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf+(xgrid[-1]-xgrid[0])*0,KDE_conf+0.08*KDEmode),color=colour,fontsize=FS+1,weight='bold',ha='right')
 				#For LHS Boundary
 				elif irange[0]==0:         ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf,KDE_conf),color=colour,fontsize=FS+1,weight='bold')
 				if not paperstyle:
-					pl.annotate("%s %s"%(parlabel,lg),xy=(0.3  ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')
+					pl.annotate("%s %s"%(parlabel,lg),xy=(0.3  ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')#{'<':'right','>':'left'}[lg])
 					if ic==0: pl.annotate("{:.3f}".format(x_conf),  xy=(0.65 ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')
 					if ic==1: pl.annotate("({:.3f})".format(x_conf),xy=(0.735,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
 
@@ -658,7 +658,7 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey):
 	if show:
 		pl.show()
 
-def get_Lines(stan_data, c_light):
+def get_Lines(stan_data, c_light, alt_prior):
 	"""
 	Get Lines
 
@@ -671,6 +671,9 @@ def get_Lines(stan_data, c_light):
 
 	c_light : float
 		speed of light to convert pec_unity to real value
+
+	alt_prior : bool
+		choice of sigmaCommon prior
 
 	Returns
 	----------
@@ -752,8 +755,12 @@ def get_Lines(stan_data, c_light):
 	sigmaRelstr = get_sigmaRelstr(fixed_sigmaRel, eta_sigmaRel_input)
 
 	Lines = add_siblings_galaxies(Ng, S_g)
-	Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
-	Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, '\sigma_0', 'mag')
+	if alt_prior:
+		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, 1.0, 'mag')
+		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Common}', sigmaRelstr, 1.0, 'mag')
+	else:
+		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
+		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, '\sigma_0', 'mag')
 	if use_external_distances:
 		Lines = add_sigma_Line(Lines, fixed_sigmapec, '\\rm{pec}',sigmapec, 'c', 'km s$^{-1}$')
 	Lines.append(muextstr)
