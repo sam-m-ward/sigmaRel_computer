@@ -5,3 +5,4 @@ model_files/__pycache__/
 model_files/stan_files/MultiGalFiles/current_model*
 .ipynb_checkpoints/
 bin/
+data/Store/
