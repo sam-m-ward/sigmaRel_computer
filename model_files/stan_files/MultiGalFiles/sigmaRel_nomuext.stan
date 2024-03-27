@@ -27,14 +27,15 @@ transformed parameters {
     real sigmaRel;
 
     if (sigmaRel_input!=0) {
-      sigmaRel = eta_sigmaRel_input*sigma0;
+      sigmaRel  = eta_sigmaRel_input*sigma0;
+      dM_common = eta_dM_common*sqrt(square(sigma0)-square(sigmaRel));
     }
     else {
-      sigmaRel = eta_sigmaRel_param*sigma0;
+      sigmaRel  = eta_sigmaRel_param*sigma0;
+      dM_common = eta_dM_common*0;
     }
 
     dM_rel    = eta_dM_rel*sigmaRel;
-    dM_common = eta_dM_common*sqrt(square(sigma0)-square(sigmaRel));
     for (g in 1:Ng) {
       dM_sibs[sum(S_g[:g-1])+1:sum(S_g[:g])] = dM_rel[sum(S_g[:g-1])+1:sum(S_g[:g])] + dM_common[g];
     }
