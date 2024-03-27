@@ -8,7 +8,7 @@ Methods are useful for preparing data and model before posterior computation
 Contains:
 --------------------
 ModelLoader class:
-	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, choices
+	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, alt_prior, choices
 
 	Methods are:
 		get_model_params()
@@ -25,7 +25,7 @@ import copy, re
 
 class ModelLoader:
 
-	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, choices):
+	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, alt_prior, choices):
 		"""
 		Initialisation
 
@@ -52,6 +52,7 @@ class ModelLoader:
 		self.sigmapec               = sigmapec
 		self.eta_sigmaRel_input     = eta_sigmaRel_input
 		self.use_external_distances = use_external_distances
+		self.alt_prior              = alt_prior
 
 		self.choices  = copy.deepcopy(choices) #Choices inputted in class call
 		self.stanpath = self.choices.stanpath
@@ -137,6 +138,9 @@ class ModelLoader:
 		else:
 			print (f"sigmaRel is free hyperparameter")
 			modelkey += f"_sigmaRelfree"
+		if self.alt_prior:
+			print (f"Using Alternative Prior")
+			modelkey += f"_altprior"
 		self.modelkey = modelkey
 		print ('###'*10)
 
@@ -161,7 +165,7 @@ class ModelLoader:
 		Saves current_model.stan file with appropriately edited lines
 		"""
 		#Update stan file according to choices, create temporary 'current_model.stan'
-		self.stan_filename = {True:'sigmaRel_withmuext.stan',False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+		self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
 		with open(self.stanpath+self.stan_filename,'r') as f:
 			stan_file = f.read().splitlines()
 		if ('fixed_sigmapec' in self.modelkey or 'fixed_sigma0' in self.modelkey) and self.use_external_distances:
@@ -239,9 +243,11 @@ class ModelLoader:
 		----------
 		pars with appropriate parameter names removed
 		"""
-		pars=['sigmaRel','sigma0','sigmapec']
+		pars=['sigmaRel','sigma0','sigmapec','rho','sigmaCommon']
 		if self.sigma0!='free':
 			pars.remove('sigma0')
+			pars.remove('rho')
+			pars.remove('sigmaCommon')
 		if self.sigmapec!='free':
 			pars.remove('sigmapec')
 		return pars
