@@ -8,24 +8,26 @@ Methods are useful for preparing data and model before posterior computation
 Contains:
 --------------------
 ModelLoader class:
-	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, alt_prior, choices
+	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, choices
 
 	Methods are:
 		get_model_params()
 		get_modelkey()
 		update_stan_file()
 		get_stan_data(dfmus)
+		get_stan_init(dfmus, savepath, n_chains)
 		get_pars()
 --------------------
 
 Written by Sam M. Ward: smw92@cam.ac.uk
 """
 
-import copy, re
+import copy, json, re
+import numpy as np
 
 class ModelLoader:
 
-	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, alt_prior, choices):
+	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, choices):
 		"""
 		Initialisation
 
@@ -45,6 +47,14 @@ class ModelLoader:
 		use_external_distances : bool or None
 			option to include external distance constraints
 
+		zmarg : bool
+			if False, use LCDM distances and Gaussian uncertainty approximation in distance
+			if True, use z_g data and draw Gaussian z_g parameters
+
+		alt_prior : bool
+			two choices of prior are [sigma0~Prior and sigmaRel~U(0,sigma0)] OR [sigmaRel~Prior; sigmaCommon~Prior]
+			alt_prior=False is former, alt_prior=True is latter
+
 		choices : class
 			class with attributes with pre-defined values (user input or None)
 		"""
@@ -52,6 +62,7 @@ class ModelLoader:
 		self.sigmapec               = sigmapec
 		self.eta_sigmaRel_input     = eta_sigmaRel_input
 		self.use_external_distances = use_external_distances
+		self.zmarg					= zmarg
 		self.alt_prior              = alt_prior
 
 		self.choices  = copy.deepcopy(choices) #Choices inputted in class call
@@ -138,6 +149,9 @@ class ModelLoader:
 		else:
 			print (f"sigmaRel is free hyperparameter")
 			modelkey += f"_sigmaRelfree"
+		if self.zmarg:
+			print ("Marginalising over z_g parameters")
+			modelkey += f"_zmarg"
 		if self.alt_prior:
 			print (f"Using Alternative Prior")
 			modelkey += f"_altprior"
@@ -166,6 +180,8 @@ class ModelLoader:
 		"""
 		#Update stan file according to choices, create temporary 'current_model.stan'
 		self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+		#self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt5.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+		if self.zmarg:	self.stan_filename = self.stan_filename.replace('.stan','_zmarg.stan')
 		with open(self.stanpath+self.stan_filename,'r') as f:
 			stan_file = f.read().splitlines()
 		if ('fixed_sigmapec' in self.modelkey or 'fixed_sigma0' in self.modelkey) and self.use_external_distances:
@@ -205,6 +221,9 @@ class ModelLoader:
 		stan_data : dict
 		 	dictionary with data to fit
 		"""
+		#Cosmo for marginalising over z and computing luminosity distances in model
+		H0 = 73.24 ; Om0 = 0.28 ; Ol0 = 0.72 ; c_light = 299792458
+		q0 = Om0/2 - Ol0 ; j0 = Om0 + Ol0 ; c_H0 = c_light/(H0*1e3)
 
 		print ('###'*30)
 		print (f"Beginning Stan fit: {self.modelkey}")
@@ -224,14 +243,56 @@ class ModelLoader:
 		#Load up data
 		stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcmbs','zcmberrs','sigmaRel_input','eta_sigmaRel_input'],
 							 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcmbs , zcmberrs , self.sigmaRel_input , etamapper(self.eta_sigmaRel_input) ]))
-		if not self.use_external_distances:
+		if not self.use_external_distances or self.zmarg:
 			stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcmbs','zcmberrs']}
+		#if self.alt_prior:
+		#	stan_data = {key:value for key,value in stan_data.items() if key not in ['sigmaRel_input','eta_sigmaRel_input']}
+		if self.zmarg:
+			stan_data['zg_data']     = zcmbs#[np.array([zc,zc]) for zc in zcmbs]
+			stan_data['zgerrs_data'] = zcmberrs#[np.ones((2,2))*ze for ze in zcmberrs]
+			stan_data['q0'] = q0 ; stan_data['j0'] = j0 ; stan_data['c_H0'] = c_H0
+
 		if self.sigma0!='free':
 			stan_data['sigma0']    = self.sigma0
 		if self.sigmapec!='free':
 			stan_data['pec_unity'] = self.sigmapec*1e3/self.choices.c_light
 
 		return stan_data
+
+	def get_stan_init(self, dfmus, savepath, n_chains):
+		"""
+		Get Stan Initialisations
+
+		Important for fits with redshift parameters, often gets stuck if z not initialised
+		Cmdstanpy works by loading in a list of filenames, one for each chain. Each filename is a json corresponding to a dictionary with values that are the initialisations
+
+		Parameters
+		----------
+		dfmus : pandas Dataframe
+			data, columns are ['Galaxy','zcmb_hats']
+
+		savepath : str
+			path where json files are saved/loaded
+
+		n_chains : int
+			no. of chains
+
+		Returns
+		----------
+		stan_init : list of str
+			jsons files with initialisations
+		"""
+		if self.zmarg:
+			z_guesses = dfmus.groupby('Galaxy')['zcmb_hats'].agg('mean').to_numpy().tolist()
+			json_file = {'zcmb':z_guesses,'pec_unity':250/3e5}#,'nuhelio':np.ones(stan_data['Ng']).tolist()}
+		else:
+			json_file = {}
+
+		with open(f"{savepath}inits.json", "w") as f:
+			json.dump(json_file, f)
+
+		stan_init  = [f"{savepath}inits.json" for _ in range(n_chains)]
+		return stan_init
 
 	def get_pars(self):
 		"""
