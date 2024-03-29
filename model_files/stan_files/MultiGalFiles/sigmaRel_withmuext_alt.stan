@@ -10,9 +10,6 @@ data {
     vector[Ng] zcmbs;
     vector[Ng] zcmberrs;
 
-    real<lower=0,upper=1> sigmaRel_input;      //Option to fix sigmaRel at a fraction of sigma0, if 0, don't fix, if 1, fix
-    real<lower=0,upper=1> eta_sigmaRel_input;  //The fraction of sigma0, e.g. eta_sigmaRel_input=0.5 is sigmaRel = sigma0/2
-
     //real<lower=0,upper=1> sigma0;    //Data
     //real<lower=0,upper=1> pec_unity; //Data
 }
@@ -52,10 +49,9 @@ model {
     eta_dM_common ~ std_normal();
     eta_dM_rel    ~ std_normal();
 
-    sigmaRel     ~ uniform(0,1);
-    sigmaCommon  ~ uniform(0,1);
-
-    pec_unity ~ uniform(0,1);
+    sigmaRel    ~ uniform(0,1);
+    sigmaCommon ~ uniform(0,1);
+    pec_unity   ~ uniform(0,1);
 
     for (g in 1:Ng){
       mu_sib_phots[sum(S_g[:g-1])+1:sum(S_g[:g])] ~ normal(mu_true_gal[g]+dM_sibs[sum(S_g[:g-1])+1:sum(S_g[:g])],mu_sib_phot_errs[sum(S_g[:g-1])+1:sum(S_g[:g])]);
