@@ -603,7 +603,7 @@ class PARAMETER:
 				ax[row,row].plot(np.ones(2)*x_conf,[0,KDE_conf],c=colour)
 				ax[row,row].fill_between(xgrid[irange[0]:irange[1]],np.zeros(irange[1]-irange[0]),KDE[irange[0]:irange[1]],color=colour,alpha=alph*(1-0.5*ic)*0.5)#half factor because gets doubled over
 				#For RHS Boundary
-				if irange[-1]==len(xgrid): ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf+(xgrid[-1]-xgrid[0])*0,KDE_conf+0.08*KDEmode),color=colour,fontsize=FS+1,weight='bold',ha='right')
+				if irange[-1]==len(xgrid): ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf+(xgrid[-1]-xgrid[0]),KDE_conf+0.08*KDEmode),color=colour,fontsize=FS+1,weight='bold',ha='right')
 				#For LHS Boundary
 				elif irange[0]==0:         ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf,KDE_conf),color=colour,fontsize=FS+1,weight='bold')
 				if not paperstyle:
@@ -699,6 +699,8 @@ def get_Lines(stan_data, c_light, alt_prior):
 
 	if 'mu_ext_gal' in stan_data:
 		use_external_distances = True	;	muextstr = 'Used Ext. Distances'
+	elif 'zg_data' in stan_data:
+		use_external_distances = True   ;   muextstr = 'Used Redshift Estimates'
 	else:
 		use_external_distances = False	;	muextstr = 'No Ext. Distances'
 
