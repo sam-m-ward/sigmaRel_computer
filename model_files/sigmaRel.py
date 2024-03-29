@@ -16,9 +16,9 @@ multi_galaxy class:
 		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
-		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, alt_prior=False, overwrite=True)
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True)
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False)
-		compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],show=False,save=True,blind=False)
+		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
 		plot_parameters(PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,show=False, save=True,markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec=250,text_index = 3, annotate_mode = 'legend',args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
@@ -262,16 +262,19 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, alt_prior=False, overwrite=True):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True):
 		"""
 		sigmaRel Sampler
 
 		Core method, used to take individual siblings distance estimates to multiple galaxies, and compute posteriors on sigmaRel
 		Options to:
 			- fix or free sigma0
-			- fix or free correlation coefficient rho = sigmalRel/sigma0
 			- fix or free sigmapec
+			- fix or free correlation coefficient rho = sigmalRel/sigma0
 			- include external distance constraints
+			- marginalise over z_g parameters
+			- choose different sigma_int priorss, default is sigma0~Uninformative and sigmaRel~U(0,sigma0); alternative is sigmaRel, sigmaCommon~Uninformative
+
 
 		Parameters
 		----------
@@ -291,6 +294,10 @@ class multi_galaxy_siblings:
 		use_external_distances : bool (optional; default=False)
 			option to include external distance constraints
 
+		zmarg : bool (optional; default=False)
+			if False, use LCDM distances and Gaussian uncertainty approximation in distance
+			if True, use z_g data and draw Gaussian z_g parameters
+
 		alt_prior : bool (optional; default=False)
 			two choices of prior are [sigma0~Prior and sigmaRel~U(0,sigma0)] OR [sigmaRel~Prior; sigmaCommon~Prior]
 			alt_prior=False is former, alt_prior=True is latter
@@ -302,8 +309,10 @@ class multi_galaxy_siblings:
 		----------
 		self.FIT, posterior samples saved in self.productpath
 		"""
+		if alt_prior and sigma0!='free':
+			raise Exception('Cannot use alternative prior and while not freeing sigma0')
 		#Initialise model with choices
-		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, alt_prior, self)
+		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, self)
 		#Get values, either default or user input
 		modelloader.get_model_params()
 		#Get string name for creating/saving files and models
@@ -319,11 +328,12 @@ class multi_galaxy_siblings:
 			dfmus = copy.deepcopy(self.dfmus)
 			#Get stan_data
 			stan_data   = modelloader.get_stan_data(dfmus)
+			stan_init   = modelloader.get_stan_init(dfmus, self.productpath, self.n_chains)
 			self.pars   = modelloader.get_pars()
 
 			#Initialise and fit model
 			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
-			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup)
+			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init)
 			df          = fit.draws_pd()
 
 			#Thin samples
@@ -427,7 +437,7 @@ class multi_galaxy_siblings:
 
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self,prior_upper_bounds=[1.0],show=False,save=True,blind=False):
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
@@ -435,6 +445,9 @@ class multi_galaxy_siblings:
 
 		Parameters
 		----------
+		PAR : str (optional; default='mu')
+			parameter to constrain dispersion for
+
 		prior_upper_bounds : list (optional; default=[1.0])
 			choices of sigmaRel prior upper bound
 
@@ -465,7 +478,7 @@ class multi_galaxy_siblings:
 		#For each galaxy, compute sigmaRel likelihood
 		for g,gal in enumerate(self.dfmus['Galaxy'].unique()):
 			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]												#Use dummy value for sigma0
-			sibgal = siblings_galaxy(dfgal['mus'].values,dfgal['mu_errs'].values,dfgal['SN'].values,gal,sigma0=0.1,prior_upper_bounds=self.prior_upper_bounds)
+			sibgal = siblings_galaxy(dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,gal,sigma0=0.1,prior_upper_bounds=self.prior_upper_bounds)
 			sibgal.get_sigmaRel_posteriors()
 			for p in self.prior_upper_bounds:
 				total_posteriors[p] *= sibgal.posteriors[p]*p #Multiply likelihoods, so divide out prior for each galaxy
@@ -632,11 +645,12 @@ class multi_galaxy_siblings:
 			raise Exception(f"Require g_or_z in [g,z], but got {g_or_z}")
 
 		for iax,PAR in enumerate(PARS):
-			subtract_mean = {'mu':True,'theta':False,'AV':False,'RV':False}[PAR] if subtract_g_mean is None else subtract_g_mean
+			subtract_mean = {'mu':True,'theta':False,'AV':False,'RV':False,'etaAV':False}[PAR] if subtract_g_mean is None else subtract_g_mean
 			if PAR=='mu':		ylabel = r"$\hat{\mu}_s - \overline{\hat{\mu}_s}$ (mag)" if subtract_mean else r"$\hat{\mu}_s$ (mag)"	;	pword = 'Distance'
 			if PAR=='AV':		ylabel = r"$\hat{A}^s_V - \overline{\hat{A}^s_V}$ (mag)" if subtract_mean else r"$\hat{A}^s_V$ (mag)"	;	pword = 'Dust Extinction'
 			if PAR=='RV':		ylabel = r"$\hat{R}^s_V - \overline{\hat{R}^s_V}$" 		 if subtract_mean else r"$\hat{R}^s_V$"			;	pword = 'Dust Law Shape'
 			if PAR=='theta':	ylabel = r"$\hat{\theta}_s - \overline{\hat{\theta}_s}$" if subtract_mean else r"$\hat{\theta}_s$"		;	pword = 'Light Curve Shape'
+			if PAR=='etaAV':	ylabel = r"$\hat{\eta}^s_{A_V} - \overline{\hat{\eta}^s_{A_V}}$ (mag)" if subtract_mean else r"$\hat{\eta}^s_{A_V}$ (mag)"	;	pword = 'Repar. Dust Extinction'
 
 			if iax==0:
 				fig.axes[0].set_title(f"Individual Siblings {pword if not multiplot else 'Parameter'} Estimates",weight='bold',fontsize=self.FS+1)
@@ -647,7 +661,7 @@ class multi_galaxy_siblings:
 				mus,muerrs,SNe,Sg = dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,dfgal.shape[0]
 				if PAR=='mu':	fullerrors = np.array([plot_sigma0**2 + err**2 for err in muerrs])**0.5
 				xgs  = [mini_d*(ss-(Sg-1)/2) for ss in range(Sg)] + x_coords[igal]
-				mubar = np.average(mus) if g_or_z=='g' or PAR!='mu' else cosmo.distmod(x_coords[igal]).value-2.5
+				mubar = np.average(mus) if g_or_z=='g' or PAR!='mu' else cosmo.distmod(x_coords[igal]).value
 				#For each SN
 				for mu,err,ss in zip(mus,muerrs,np.arange(Sg)):
 					#Choice of labelling for legend/SNe
