@@ -59,8 +59,8 @@ transformed parameters {
 model {
     eta_dM_common ~ std_normal();
     eta_dM_rel    ~ std_normal();
-    eta_sigmaRel_param  ~ uniform(0,1);
 
+    eta_sigmaRel_param ~ uniform(0,1);
     sigma0    ~ uniform(0,1);
     pec_unity ~ uniform(0,1);
 
