@@ -3,6 +3,7 @@ plots/
 products/
 model_files/__pycache__/
 model_files/stan_files/MultiGalFiles/current_model*
+model_files/stan_files/linear_reg/current_model*
 .ipynb_checkpoints/
 bin/
 data/Store/
