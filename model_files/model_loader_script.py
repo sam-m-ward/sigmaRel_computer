@@ -228,7 +228,7 @@ class ModelLoader:
 		print ('###'*30)
 		print (f"Beginning Stan fit: {self.modelkey}")
 		#Groupby galaxy to count Nsibs per galaxy
-		Gal   = dfmus.groupby('Galaxy',sort=False)[['muext_hats','zcmb_hats','zcmb_errs']].agg('mean')
+		Gal   = dfmus.groupby('Galaxy',sort=False)[['muext_hats','zcmb_hats','zcmb_errs','zhelio_hats']].agg('mean')
 		Ng    = Gal.shape[0]
 		S_g   = dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
 		Nsibs = int(sum(S_g))
@@ -238,7 +238,8 @@ class ModelLoader:
 		mu_sib_phots     = dfmus['mus'].values
 		mu_sib_phot_errs = dfmus['mu_errs'].values
 		#External Distances
-		mu_ext_gal, zcmbs, zcmberrs = [Gal[col].tolist() for col in Gal.columns]
+		mu_ext_gal, zcmbs, zcmberrs, zhelios = [Gal[col].tolist() for col in Gal.columns]
+
 		def etamapper(x): return 0 if x is None else x
 		#Load up data
 		stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcmbs','zcmberrs','sigmaRel_input','eta_sigmaRel_input'],
@@ -247,9 +248,10 @@ class ModelLoader:
 			stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcmbs','zcmberrs']}
 		#if self.alt_prior:
 		#	stan_data = {key:value for key,value in stan_data.items() if key not in ['sigmaRel_input','eta_sigmaRel_input']}
-		if self.zmarg:
-			stan_data['zg_data']     = zcmbs#[np.array([zc,zc]) for zc in zcmbs]
-			stan_data['zgerrs_data'] = zcmberrs#[np.ones((2,2))*ze for ze in zcmberrs]
+		if self.zmarg:#stan_data['zg_data']     = zcmbs#stan_data['zgerrs_data'] = zcmberrs#stan_data['zg_data']     = [np.array([zh,zc]) for zh,zc in zip(zcmbs, zhelios)]#stan_data['zgerrs_data'] = [np.ones((2,2))*ze for ze in zcmberrs]#Assume measurements errors on zcmb and zhelio are the same, and they are perfectly correlated
+			stan_data['zhelio_hats'] = zhelios
+			stan_data['zpo_hats']    = np.asarray(zhelios)-np.asarray(zcmbs)
+			stan_data['zhelio_errs'] = zcmberrs#Assume measurements errors on zcmb and zhelio are the same, and they are perfectly correlated
 			stan_data['q0'] = q0 ; stan_data['j0'] = j0 ; stan_data['c_H0'] = c_H0
 
 		if self.sigma0!='free':
@@ -282,9 +284,9 @@ class ModelLoader:
 		stan_init : list of str
 			jsons files with initialisations
 		"""
-		if self.zmarg:
-			z_guesses = dfmus.groupby('Galaxy')['zcmb_hats'].agg('mean').to_numpy().tolist()
-			json_file = {'zcmb':z_guesses,'pec_unity':250/3e5}#,'nuhelio':np.ones(stan_data['Ng']).tolist()}
+		if self.zmarg:#zh_guesses = dfmus.groupby('Galaxy')['zhelio_hats'].agg('mean').to_numpy()#zg_param_guesses = np.vstack((zh_guesses,zc_guesses)).T#zg_param_guesses = dfmus.groupby('Galaxy')[['zhelio_hats','zcmb_hats']].agg('mean').to_numpy().tolist()#json_file = {'zg_param':zg_param_guesses,'pec_unity':250/3e5}#,'nuhelio':np.ones(stan_data['Ng']).tolist()}
+			zc_guesses = dfmus.groupby('Galaxy')['zcmb_hats'].agg('mean').to_numpy().tolist()
+			json_file = {'zHDs':zc_guesses,'pec_unity':250/3e5}
 		else:
 			json_file = {}
 
