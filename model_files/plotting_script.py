@@ -699,7 +699,7 @@ def get_Lines(stan_data, c_light, alt_prior):
 
 	if 'mu_ext_gal' in stan_data:
 		use_external_distances = True	;	muextstr = 'Used Ext. Distances'
-	elif 'zg_data' in stan_data:
+	elif 'zhelio_hats' in stan_data:
 		use_external_distances = True   ;   muextstr = 'Used Redshift Estimates'
 	else:
 		use_external_distances = False	;	muextstr = 'No Ext. Distances'
