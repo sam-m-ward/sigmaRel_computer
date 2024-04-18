@@ -18,7 +18,7 @@ multi_galaxy class:
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True)
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False)
-		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False)
+		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
 		plot_parameters(PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,show=False, save=True,markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec=250,text_index = 3, annotate_mode = 'legend',args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
@@ -36,7 +36,7 @@ siblings_galaxy class:
 		get_weighted_mu()
 		combine_individual_distances(mode=None,overwrite=True)
 		plot_individual_distances(colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025,plot_full_errors=True)
-		plot_sigmaRel_posteriors(xupperlim=0.16,colours = ['green','purple','goldenrod'], blind=False)
+		plot_sigmaRel_posteriors(xupperlim=0.16,colours = ['green','purple','goldenrod'], blind=False, fig_ax=None)
 		plot_common_distances(markersize=10,capsize=8,mini_d=0.025)
 --------------------
 
@@ -437,7 +437,7 @@ class multi_galaxy_siblings:
 
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False):
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
@@ -459,6 +459,9 @@ class multi_galaxy_siblings:
 
 		blind : bool (optional; default=False)
 			if True, blind sigmaRel plot axes and posterior summaries
+
+		fig_ax : None or list (optional; default=None)
+			if None, create new figure, else, fig_ax = [fig,ax,counter], where counter denotes how many times figure has been used
 
 		End Product(s)
 		----------
@@ -496,11 +499,13 @@ class multi_galaxy_siblings:
 			sibgal.save     = save
 			sibgal.galname  = self.samplename
 			sibgal.plotpath = self.plotpath
-			sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive',blind=blind)
+			sibgal.plot_sigmaRel_posteriors(xupperlim='adaptive',blind=blind, fig_ax=fig_ax)#Assigns fig_ax attribute inside method
 
 		#Store posteriors as attribute
 		self.total_posteriors = total_posteriors
 		self.sigRs_store      = sigRs_store
+		if sibgal.fig_ax is not None:
+			return sibgal.fig_ax[0], sibgal.fig_ax[1], sibgal.fig_ax[2] #fig, ax, kmax
 
 
 	def loop_single_galaxy_analyses(self):
@@ -1089,7 +1094,7 @@ class siblings_galaxy:
 		if self.show:
 			pl.show()
 
-	def plot_sigmaRel_posteriors(self,xupperlim=0.25,colours=None,blind=False):
+	def plot_sigmaRel_posteriors(self,xupperlim=0.25,colours=None,blind=False,fig_ax=None):
 		"""
 		Plot Sigma_Rel Posteriors
 
@@ -1106,6 +1111,9 @@ class siblings_galaxy:
 		blind : bool (optional; default=False)
 			if True, blind sigmaRel plot axes and posterior summaries
 
+		fig_ax : None or list (optional; default=None)
+			if None, create new figure, else, fig_ax = [fig,ax,counter], where counter denotes how many times figure has been used
+
 		Returns
 		----------
 		plot of sigmaRel posterior overlays
@@ -1113,24 +1121,48 @@ class siblings_galaxy:
 		alph = 0.2 ; dfs = 3
 		if 'posteriors' not in list(self.__dict__.keys()):
 			self.get_sigmaRel_posteriors()
-		if colours is None: colours = ['green','purple','goldenrod']
+		if colours is None:
+			colours    = ['green','purple','goldenrod']
+			linestyles = ['-','--',':','-.']
 
-		fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
-		pl.title(r'$\sigma_{\rm{Rel}}$-Posterior from Individual Distance Estimates',fontsize=self.FS+1, weight='bold')
+		if fig_ax is None:#Create new figure
+			fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
+			pl.title(r'$\sigma_{\rm{Rel}}$-Posterior from Individual Distance Estimates',fontsize=self.FS+1, weight='bold')
+			counter = 0 ; kmax = 0 ; leglabel = ''
+		else:#Load old figure
+			try:
+				fig,ax,counter,leglabel,kmax = fig_ax[:]
+			except:
+				fig,ax,counter,leglabel = fig_ax[:]
+				kmax = 0
+
+
 		XQs = {0.005:[],0.995:[]}
+		if kmax!=0:
+			kfac = max([np.amax(posterior) for posterior in self.posteriors.values()])
+			self.posteriors = {key:value*kmax/kfac for key,value in self.posteriors.items()}
+
 		for ip,prior_upper_bound in enumerate(self.prior_upper_bounds):
-			ccc = colours[ip]
+			ip += counter
+			try:	ccc = colours[ip]; lw = linestyles[ip] if fig_ax is not None else '-'
+			except:	ccc = f'C{ip%10}'; lw = linestyles[ip%len(linestyles)] if fig_ax is not None else '-'
 			self.posterior = self.posteriors[prior_upper_bound]
 			self.sigRs     = self.sigRs_store[prior_upper_bound]
 			#Plots
-			fig.axes[0].plot(self.sigRs, self.posterior,c=ccc)
+			fig.axes[0].plot(self.sigRs, self.posterior,c=ccc,label=leglabel,linestyle=lw)
 			fig.axes[0].plot([self.sigRs[-1],self.sigRs[-1]],[0,self.posterior[-1]],linestyle='--',c=ccc)
+			kmax = max([kmax,np.amax(self.posterior)])
 			#Begin Annotations
-			Xoff = 0.65 ; dX   = 0.08 ; Yoff = 0.845 ; dY   = 0.07
+			Xoff = 0.65 ; dX   = 0.08 ; Yoff = 0.845 ; dY   = 0.07 ; dyoff = -0.275001
+			#~~~
+			#if leglabel=='':
+			if leglabel!='':
+				Yoff += -0.2
 			fig.axes[0].annotate('Prior Distribution',xy=(Xoff,Yoff+dY),			   xycoords='axes fraction',fontsize=15.5, ha='left')
-			fig.axes[0].annotate('Posterior Summary', xy=(Xoff,Yoff+dY-0.275001*1.125),xycoords='axes fraction',fontsize=15.5, ha='left')
 			LABEL = r'$\sigma_{\rm{Rel}} \sim U (0,%s)$'%(str(round(float(prior_upper_bound),3)))
 			fig.axes[0].annotate(LABEL,xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
+			#~~~
+			fig.axes[0].annotate('Posterior Summary', xy=(Xoff,Yoff+dY-0.275001*1.125),xycoords='axes fraction',fontsize=15.5, ha='left')
 			#Decide how to summarise posterior
 			KDE = copy.deepcopy(self.posterior)
 			imode = np.argmax(KDE)
@@ -1138,7 +1170,8 @@ class siblings_galaxy:
 			condition1 = np.argmax(KDE)!=0 and np.argmax(KDE)!=len(KDE)-1#KDE doesnt peak at prior boundary
 			hh = np.exp(-1/8)#Gaussian height at sigma/2 #KDE is not near flat topped at prior boundary
 			condition2 = not (KDE[0]>=hh*KDEmode or KDE[-1]>=hh*KDEmode)
-			Yoff += -0.275001*1.125
+
+			Yoff += dyoff*1.125
 			for q in XQs:
 				XQs[q].append(self.get_quantile(q)[0])
 			if condition1 and condition2:
@@ -1174,28 +1207,32 @@ class siblings_galaxy:
 				s68 = "{:.3f}".format(sigma_68) ; s95 = "({:.3f})".format(sigma_95)
 				if blind:	s68,s95 = '0.X','(0.X)'
 				fig.axes[0].annotate("%s %s %s %s"%(r'$\sigma_{\rm{Rel}}$',lg, s68, s95),xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
-			Yoff +=  0.275001
+			Yoff +=  dyoff
 
 		fig.axes[0].set_yticks([])
-		YMIN,YMAX = list(pl.gca().get_ylim())[:]
 		if xupperlim!='adaptive':
-			pl.gca().set_xlim([0,xupperlim])
+			fig.axes[0].set_xlim([0,xupperlim])
 			fig.axes[0].set_xticks(np.arange(0,0.25,0.05))
 		else:
 			qmin,qmax = min(list(XQs.keys())),max(list(XQs.keys()))
 			DX = max(XQs[qmax]) - min(XQs[qmin]) ; fac = 0.1
-			pl.gca().set_xlim([max([0,min(XQs[qmin])-DX*fac]),max(XQs[qmax])+DX*2*fac])
+			fig.axes[0].set_xlim([max([0,min(XQs[qmin])-DX*fac]),max(XQs[qmax])+DX*2*fac])
 		if blind:	fig.axes[0].set_xticks([])
-		fig.axes[0].set_ylim([0,YMAX])
 		fig.axes[0].set_ylabel(r'Posterior Density',fontsize=self.FS)
 		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$ (mag)',fontsize=self.FS)#fig.text(0, 0.5, 'X', rotation=90, va='center', ha='center',color='white',fontsize=100)#fig.text(-0.06, 0.5, 'Posterior Density', rotation=90, va='center', ha='center',color='black',fontsize=self.FS)
 		pl.tick_params(labelsize=self.FS)
-		pl.tight_layout()
 		if self.save:
+			YMIN,YMAX = list(fig.axes[0].get_ylim())[:]
+			fig.axes[0].set_ylim([0,YMAX])
+			if leglabel!='':	pl.legend(loc='upper right',fontsize=self.FS-2,framealpha=1)
+			pl.tight_layout()
 			pl.savefig(f"{self.plotpath}{self.galname}_SigmaRelPosteriors.pdf",bbox_inches="tight")
 		if self.show:
 			pl.show()
-
+		if fig_ax is not None:
+			self.fig_ax = [fig,ax,kmax]
+		else:
+			self.fig_ax = fig_ax
 	def plot_common_distances(self,markersize=10,capsize=8,mini_d=0.025):
 		"""
 		Plot Common Distances
