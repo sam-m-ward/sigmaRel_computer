@@ -16,8 +16,8 @@ multi_galaxy class:
 		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
-		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True)
-		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False)
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False)
+		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False)
 		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
@@ -243,10 +243,10 @@ class multi_galaxy_siblings:
 		self.parnames, self.dfparnames, self.parlabels, self.bounds
 		"""
 		#Initialisation
-		parnames   = ['sigmaRel','sigma0','sigmapec','rho','sigmaCommon']
-		dfparnames = ['sigmaRel','sigma0','sigmapec','rho','sigmaCommon']
-		parlabels  = ['$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_0$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)','$\\rho$','$\\sigma_{\\rm{Common}}$ (mag)']
-		bounds     = [[0,None],[0,1],[0,self.c_light],[0,1],[0,None]]
+		parnames   = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon']
+		dfparnames = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon']
+		parlabels  = ['$\\sigma_0$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)','$\\rho$','$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_{\\rm{Common}}$ (mag)']
+		bounds     = [[0,1],[0,self.c_light],[0,1],[0,None],[0,None]]
 
 		#Filter on pars
 		PARS  = pd.DataFrame(data=dict(zip(['dfparnames','parlabels','bounds'],[dfparnames,parlabels,bounds])),index=parnames)
@@ -262,7 +262,7 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False):
 		"""
 		sigmaRel Sampler
 
@@ -304,6 +304,9 @@ class multi_galaxy_siblings:
 
 		overwrite : bool (optional; default=True)
 			option to overwrite previously saved .pkl posterior samples
+
+		blind : bool (optional; default=False)
+			option to mask posterior results
 
 		End Product(s)
 		----------
@@ -357,8 +360,9 @@ class multi_galaxy_siblings:
 			for col in self.pars:
 				print ('###'*10)
 				print (f'{col}, median, std, 16, 84 // 68%, 95%')
-				print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
-				print (df[col].quantile(0.68).round(3),df[col].quantile(0.95).round(3))
+				if not blind:
+					print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
+					print (df[col].quantile(0.68).round(3),df[col].quantile(0.95).round(3))
 				print ('Rhat:', fitsummary.loc[col]['r_hat'])
 
 		else:#Else load up
@@ -369,7 +373,7 @@ class multi_galaxy_siblings:
 		#Print distance summaries
 		self.FIT  = FIT
 
-	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False):
+	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False):
 		"""
 		Plot Posterior Samples
 
@@ -394,6 +398,9 @@ class multi_galaxy_siblings:
 
 		returner : bool (optional; default=False)
 			if True, return posterior summaries for use in a Table
+
+		blind : bool (optional; default=False)
+			option to mask posterior results
 
 		End Product(s)
 		----------
@@ -427,7 +434,7 @@ class multi_galaxy_siblings:
 		#Corner Plot
 		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
 		postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
-		Summary_Strs = postplot.corner_plot()#Table Summary
+		Summary_Strs = postplot.corner_plot(verbose=not blind,blind=blind)#Table Summary
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
 		finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior),save,show,self.plotpath,savekey)
