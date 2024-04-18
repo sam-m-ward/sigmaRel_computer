@@ -306,7 +306,7 @@ class ModelLoader:
 		----------
 		pars with appropriate parameter names removed
 		"""
-		pars=['sigmaRel','sigma0','sigmapec','rho','sigmaCommon']
+		pars=['sigma0','sigmapec','rho','sigmaRel','sigmaCommon']
 		if self.sigma0!='free':
 			pars.remove('sigma0')
 			pars.remove('rho')
