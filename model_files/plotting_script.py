@@ -17,8 +17,8 @@ POSTERIOR_PLOTTER class:
 
 	Methods are:
 		update_lims(Nsig=3)
-		corner(fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15)
-		corner_plot(verbose=True)
+		corner(fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15, blind=False)
+		corner_plot(verbose=True, blind=False)
 
 PARAMETER class:
 	inputs: chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None
@@ -28,7 +28,7 @@ PARAMETER class:
 		slice_reflection_KDE()
 		get_xgrid_KDE()
 		get_KDE_values(location=None,value=None, return_only_index=False)
-		plot_marginal_posterior(ax,colour='C0',alph=0.2,FS=14,verbose=True)
+		plot_marginal_posterior(ax,colour='C0',alph=0.2,FS=14,verbose=True,blind=False)
 --------------------
 Mostly Copied from Bird-Snack (https://github.com/sam-m-ward/birdsnack)
 Written by Sam M. Ward: smw92@cam.ac.uk
@@ -209,7 +209,7 @@ class POSTERIOR_PLOTTER:
 		self.update_lims()
 
 
-	def corner(self, fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15):
+	def corner(self, fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15, blind=False):
 		"""
 		Corner Method
 
@@ -231,6 +231,9 @@ class POSTERIOR_PLOTTER:
 
 		FS: float (optional; default=15)
 			fontsize
+
+		blind : bool (optional; default=False)
+			option to mask posterior results
 
 		End Products(s)
 		----------
@@ -301,6 +304,11 @@ class POSTERIOR_PLOTTER:
 					ax[row,col].set_xlabel(names[col],fontsize=FS)
 					if lims is not None:
 						ax[row,col].set_xlim(*lims[col])
+				if blind:
+					ax[row,col].set_xticks([])
+					ax[row,col].set_yticks([])
+		if blind:
+			ax[-1,-1].set_xticks([])
 		ax[d-1,d-1].set_xlabel(names[d-1],fontsize=FS)
 		ax[d-1,d-1].tick_params(labelsize=FS)
 		fig.subplots_adjust(top=0.9)
@@ -308,7 +316,7 @@ class POSTERIOR_PLOTTER:
 		self.fig = fig
 		self.ax  = ax
 
-	def corner_plot(self,verbose=True):
+	def corner_plot(self,verbose=True,blind=False):
 		"""
 		Plot posterior samples
 
@@ -319,6 +327,8 @@ class POSTERIOR_PLOTTER:
 		verbose: bool (optional; default=True)
 			print out summaries
 
+		blind : bool (optional; default=False)
+			option to mask posterior results
 
 		End Product(s)
 		----------
@@ -341,10 +351,10 @@ class POSTERIOR_PLOTTER:
 			parameter = PARAMETER(self.chains[row],parname,self.pardict[parname],self.lims[row],self.bounds[row],self.Rhats[parname],row,self.choices,self.smoothing)
 			parameter.get_xgrid_KDE()
 			#Plot 1D Marginal KDEs
-			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax,verbose=verbose)
+			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax,verbose=verbose,blind=blind)
 			if verbose: print ("###"*5)
 		#Plot 2D marginals
-		self.corner([fig,ax])
+		self.corner([fig,ax],blind=blind)
 		if verbose: print ("Corner samples/contours plotted successfully")
 		return Summary_Strs
 
@@ -498,7 +508,7 @@ class PARAMETER:
 		else:
 			return grid_index, xgrid_loc, KDE_height
 
-	def plot_marginal_posterior(self,ax,colour='C0',alph=0.2,FS=14,verbose=True):
+	def plot_marginal_posterior(self,ax,colour='C0',alph=0.2,FS=14,verbose=True, blind=False):
 		"""
 		Plot Marginal Posterior
 
@@ -520,6 +530,10 @@ class PARAMETER:
 
 		verbose: bool (optional; default=True)
 			if True print summaries
+
+		blind : bool (optional; default=False)
+			option to mask posterior results
+
 		Returns
 		----------
 		Summary_Str : str
@@ -576,7 +590,7 @@ class PARAMETER:
 					summary = [int(round(x,0)) for x in [self.samp_median, self.dfchain.par.quantile(0.84)-self.samp_median,self.samp_median-self.dfchain.par.quantile(0.16)]]
 				else:
 					summary = ["{:.3f}".format(x) for x in [self.samp_median, self.dfchain.par.quantile(0.84)-self.samp_median,self.samp_median-self.dfchain.par.quantile(0.16)]]
-
+				if blind: summary = ['0.X','0.X','0.X']
 				Summary_Str = f"${summary[0]}^{str('{')}+{summary[1]}{str('}')}_{str('{')}-{summary[2]}{str('}')}$"
 				ax[row,row].set_title(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), fontsize=FS)
 				#ax[row,row].set_title(parlabel + " = {:.2f} $\pm$ {:.2f}".format(self.samp_median, self.samp_std), fontsize=FS)
@@ -612,7 +626,10 @@ class PARAMETER:
 					if ic==1: pl.annotate("({:.3f})".format(x_conf),xy=(0.735,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
 
 			if paperstyle:
-				ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
+				if blind:
+					ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} 0.X (0.X)", fontsize=FS)
+				else:
+					ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
 			Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
 			if verbose: print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
