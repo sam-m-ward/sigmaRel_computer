@@ -77,6 +77,15 @@ def heliocorr(zhel, RA, Dec):
 
     return zcmb#, alpha
 
+from astropy import units as u
+from astropy.coordinates import SkyCoord
+#https://cosmicflows.iap.fr/table_query/
+def get_l_b(RA, Dec):#For cosmic flows query
+    coord = SkyCoord(ra=RA*u.degree, dec=Dec*u.degree, frame='icrs')
+    l = coord.galactic.l.value
+    b = coord.galactic.b.value
+    return l,b
+
 def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     #LOAD IN POSTERIOR CHAINS AND CREATE DFMUS
     chains_path = f'../../bayesn_for_ztf/bayesn-pre-release-dev/{chains_file}/{chains_file}_Samples/'
@@ -140,9 +149,23 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     #Add to dfmus, then compute zcmbs
     dfmus = dfmus.merge(sng[['zhelio_hats','zhelio_errs','ra','dec']],left_index=True,right_index=True,how='left').loc[dfmus.index]
     dfmus['zcmb_hats']  = dfmus[['zhelio_hats','ra','dec']].apply(lambda x: heliocorr(x[0],x[1],x[2]),axis=1)#zcmb by correcting zhelio for cmb dipole
-    dfmus['zcmb_hats']  = dfmus.groupby('Galaxy')['zcmb_hats'].transform('mean')#Simply take the mean in each Galaxy
-    dfmus['muext_hats'] = dfmus[['zhelio_hats','zcmb_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
 
+    #Get text file for use in cosmic flows
+    dfmus[['l','b']] = dfmus[['ra','dec','zcmb_hats']].apply(lambda x: get_l_b(x[0],x[1]),axis=1,result_type='expand')
+    try:
+        df_flowcorr = pd.read_csv('products/table_for_cosmicflows_out.txt',skiprows=17,header=None,names=['l','b','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
+        assert(df_flowcorr.shape[0]==dfmus.shape[0])
+        dfmus.loc[:,'zHD_hats'] = df_flowcorr['vHD'].values/299792.458
+    except:
+        dfmus[['l','b','zcmb_hats']].to_csv('products/table_for_cosmicflows.txt',index=False,header=None,sep=' ')
+        raise Exception('Please take products/table_for_cosmicflows.txt and upload to https://cosmicflows.iap.fr/table_query/ using J2000 galactic coords and velocity in c \n save as products/table_for_cosmicflows_out.txt')
+
+    #For simplicity, take mean of zcmb and zHD (and zhelio is already same for both sibs)
+    print ('Taking mean of zHD, differences between original and new should be negligible:')
+    print (dfmus['zHD_hats'] - dfmus.groupby('Galaxy')['zHD_hats'].transform('mean'))
+    dfmus['zcmb_hats']  = dfmus.groupby('Galaxy')['zcmb_hats'].transform('mean')#Simply take the mean in each Galaxy
+    dfmus['zHD_hats']   = dfmus.groupby('Galaxy')['zHD_hats'].transform('mean')#Simply take the mean in each Galaxy
+    dfmus['muext_hats'] = dfmus[['zhelio_hats','zHD_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
     #########################
     '''
     #Examine correlation of zhelio and zcmbs, simulate gaussian zhels, compute zcmbs, then compute their correlation
@@ -159,7 +182,10 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     #########################
 
     #FINAL TOUCHES
+    print ('Setting measurement errors on zcmb/zHD to be same as on zhelio; thus assuming errors are perfectly correlated and no additional errors in CMB or flow corrections')
+    print ('This is fine for cmb, but unclear how flow correction would change with strong changes in zhelio(or equivalently zcmb)')
     dfmus['zcmb_errs'] = dfmus['zhelio_errs'].copy()#Keep things simple seeing as these columns are essentially identical
+    dfmus['zHD_errs']  = dfmus['zhelio_errs'].copy()#Keep things simple seeing as these columns are essentially identical
     dfmus.reset_index(inplace=True)#Move SN to columns
     return dfmus
     '''
