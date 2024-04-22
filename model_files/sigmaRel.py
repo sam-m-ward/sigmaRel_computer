@@ -21,7 +21,7 @@ multi_galaxy class:
 		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
-		plot_parameters(PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,show=False, save=True,markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec=250,text_index = 3, annotate_mode = 'legend',args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
+		plot_parameters(PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,zword='zHD_hats',show=False, save=True,markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec=250,text_index = 3, annotate_mode = 'legend',args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
 
 
 siblings_galaxy class:
@@ -562,7 +562,7 @@ class multi_galaxy_siblings:
 		return dx, ha
 
 
-	def plot_parameters(self, PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,
+	def plot_parameters(self, PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,zword='zHD_hats',
 							show=False, save=True,
 							markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec = 250,
 							text_index = 3, annotate_mode = 'legend',
@@ -589,6 +589,9 @@ class multi_galaxy_siblings:
 
 		subtract_g_mean: None (optional; default=None)
 			if None, becomes True for PAR=='mu' or False for PAR=='theta','AV','RV'
+
+		zword : str (optional; default='zHD_hats')
+			option to plot zHD or could choose e.g. zcmb_hats
 
 		show, save: bools (optional; default=False,True)
 			whether to show/save plot
@@ -648,7 +651,7 @@ class multi_galaxy_siblings:
 			x_coords = np.arange(Ng.shape[0])
 			mini_d=0.3
 		elif g_or_z=='z':
-			x_coords = self.dfmus.groupby('Galaxy',sort=False)['zcmb_hats'].agg('mean').values
+			x_coords = self.dfmus.groupby('Galaxy',sort=False)[zword].agg('mean').values
 			mini_d=0.0035
 			cosmo  = FlatLambdaCDM(H0=73.24,Om0=0.28)
 			#print(x_coords)
@@ -672,7 +675,7 @@ class multi_galaxy_siblings:
 				dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
 				mus,muerrs,SNe,Sg = dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,dfgal.shape[0]
 				if PAR=='mu':	fullerrors = np.array([plot_sigma0**2 + err**2 for err in muerrs])**0.5
-				xgs  = [mini_d*(ss-(Sg-1)/2) for ss in range(Sg)] + x_coords[igal]
+				xgs  = np.array([mini_d*(ss-(Sg-1)/2) for ss in range(Sg)]) + x_coords[igal]
 				mubar = np.average(mus) if g_or_z=='g' or PAR!='mu' else cosmo.distmod(x_coords[igal]).value
 				#For each SN
 				for mu,err,ss in zip(mus,muerrs,np.arange(Sg)):
@@ -711,16 +714,16 @@ class multi_galaxy_siblings:
 				fig.axes[iax].plot([-1,len(Ng)],[0,0],c='black',linewidth=1)
 				fig.axes[iax].set_xticklabels("")
 			else:
-				fig.axes[iax].plot([0,self.dfmus['zcmb_hats'].max()+0.01],[0,0],c='black',linewidth=1)
+				fig.axes[iax].plot([0,self.dfmus[zword].max()+0.01],[0,0],c='black',linewidth=1)
 				fig.axes[iax].set_ylabel(ylabel,fontsize=self.FS)
 				if PAR=='mu':
 					fig.axes[iax].set_ylabel('Hubble Residuals (mag)',fontsize=self.FS)
-					zcmbs = np.linspace(0,self.dfmus['zcmb_hats'].max()+0.01,1000)
-					sigmu = (5/(zcmbs*np.log(10)))*(plot_sigmapec*1e3/self.c_light)
+					zHDs = np.linspace(0,self.dfmus[zword].max()+0.01,1000)
+					sigmu = (5/(zHDs*np.log(10)))*(plot_sigmapec*1e3/self.c_light)
 					#ymax = np.amax(np.abs(fig.axes[iax].get_ylim()))
 					#fig.axes[iax].set_ylim([-ymax,ymax])
-					fig.axes[iax].plot(zcmbs, sigmu,linestyle='--',color='black')
-					fig.axes[iax].plot(zcmbs,-sigmu,linestyle='--',color='black')
+					fig.axes[iax].plot(zHDs, sigmu,linestyle='--',color='black')
+					fig.axes[iax].plot(zHDs,-sigmu,linestyle='--',color='black')
 
 			fig.axes[iax].tick_params(labelsize=self.FS-2)
 
@@ -731,8 +734,9 @@ class multi_galaxy_siblings:
 			fig.axes[-1].set_xlabel("GalaxyID",fontsize=self.FS)
 			fig.axes[-1].set_xlim([-1,len(Ng)])
 		if g_or_z=='z':
-			fig.axes[-1].set_xlabel(r"$z_{\rm{CMB}}$",fontsize=self.FS)
-			fig.axes[-1].set_xlim([0,self.dfmus['zcmb_hats'].max()+0.01])
+			zworddict = dict(zip(['zHD_hats','zcmb_hats'],[r"$z_{\rm{HD}}$",r"$z_{\rm{CMB}}$"]))
+			fig.axes[-1].set_xlabel(zworddict[zword],fontsize=self.FS)
+			fig.axes[-1].set_xlim([0,self.dfmus[zword].max()+0.01])
 		if annotate_mode=='legend':
 			#If/else because latter is weird fig rescaling for single panel plot
 			if not multiplot:	fig.axes[0].legend(fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
