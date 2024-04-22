@@ -21,6 +21,7 @@ multi_galaxy class:
 		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
+		plot_delta_HR(save=True,show=False)
 		plot_parameters(PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,zword='zHD_hats',show=False, save=True,markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec=250,text_index = 3, annotate_mode = 'legend',args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
 
 
@@ -51,6 +52,7 @@ import copy, os, pickle, re
 from model_loader_script import *
 from plotting_script import *
 from astropy.cosmology import FlatLambdaCDM
+from matplotlib import container
 
 class multi_galaxy_siblings:
 
@@ -561,6 +563,65 @@ class multi_galaxy_siblings:
 			dx = dd; ha='left'
 		return dx, ha
 
+	def plot_delta_HR(self,save=True,show=False):
+		'''
+		Plot Delta HR
+
+		Indicates how HR changes from adding flow corrections
+
+		Parameters
+		----------
+		show, save: bools (optional; default=False,True)
+			whether to show/save plot
+
+		End Product(s)
+		----------
+		Figure of |HR|CMB - |HR|HD
+		'''
+		#Initialise
+		pl.figure(figsize=(9.6,7.2))
+		markersize=14;capsize=5;alpha=0.75;elw=3;mew=3
+		Ng = self.dfmus['Galaxy'].unique()
+		colours = [f'C{s%10}' for s in range(self.dfmus['Galaxy'].nunique())]
+		markers = ['o','s','p','^','x','P','d','*']
+		markers = [markers[int(ig%len(markers))] for ig in range(Ng.shape[0])]
+
+		#Get Hubble Residuals
+		mini_d   = 0.0035
+		cosmo    = FlatLambdaCDM(H0=73.24,Om0=0.28)
+		zwords = ['zcmb_hats','zHD_hats']
+		HR_collection = {zword:{} for zword in zwords}
+		for zword in zwords:
+			z_hats = self.dfmus.groupby('Galaxy',sort=False)[zword].agg('mean').values
+			for igal,gal in enumerate(Ng):
+				dfgal  = self.dfmus[self.dfmus['Galaxy']==gal].copy()
+				muext  = cosmo.distmod(z_hats[igal]).value
+				for mu,ss in zip(dfgal['mus'].values,np.arange(dfgal.shape[0])):
+					HR_collection[zword][f'{igal}_{ss}'] = mu-muext
+
+		#Plot change in HR
+		zHDs   = self.dfmus.groupby('Galaxy',sort=False)['zHD_hats'].agg('mean').values
+		for igal,gal in enumerate(Ng):
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
+			Sg     = dfgal.shape[0]
+			#xgs    = np.array([mini_d*(ss-(Sg-1)/2) for ss in range(Sg)]) + zHDs[igal]#Plot against zHD
+			xgs    = np.array([np.exp(0.4*(ss-(Sg-1)/2)) for ss in range(Sg)])*dfgal['zhelio_errs'].mean()
+			for ss in range(Sg):
+				HR_cmb = abs(HR_collection['zcmb_hats'][f'{igal}_{ss}'])
+				HR_hd  = abs(HR_collection['zHD_hats'][f'{igal}_{ss}'])
+				pl.errorbar(xgs[ss],HR_cmb-HR_hd,color=colours[igal],marker=markers[igal],markersize=markersize,alpha=alpha,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
+
+		pl.ylabel(r"$|$HR$_{\rm{CMB}}|$-$|$HR$_{\rm{HD}}|$",fontsize=self.FS)
+		#pl.xlabel(r"$z_{\rm{HD}}$",fontsize=self.FS)#Plot against zHD
+		pl.xlabel(r"Error in $z_{\rm{Helio}}$",fontsize=self.FS) ; pl.xscale('log')
+		pl.gca().set_xlim([0,self.dfmus['zHD_hats'].max()+0.01])
+		pl.plot(pl.gca().get_xlim(),[0,0],color='black',linewidth=0.2)
+		pl.tight_layout()
+		pl.tick_params(labelsize=self.FS)
+		if save:
+			pl.savefig(f"{self.plotpath}HRChange.pdf", bbox_inches="tight")
+		if show:
+			pl.show()
 
 	def plot_parameters(self, PAR='mu',colours=None, markers=None, g_or_z = 'g',subtract_g_mean=None,zword='zHD_hats',
 							show=False, save=True,
@@ -659,6 +720,9 @@ class multi_galaxy_siblings:
 		else:
 			raise Exception(f"Require g_or_z in [g,z], but got {g_or_z}")
 
+		def get_muext_err(sigz,zHD):
+			return 5*sigz/(np.log(10)*zHD)
+
 		for iax,PAR in enumerate(PARS):
 			subtract_mean = {'mu':True,'theta':False,'AV':False,'RV':False,'etaAV':False}[PAR] if subtract_g_mean is None else subtract_g_mean
 			if PAR=='mu':		ylabel = r"$\hat{\mu}_s - \overline{\hat{\mu}_s}$ (mag)" if subtract_mean else r"$\hat{\mu}_s$ (mag)"	;	pword = 'Distance'
@@ -675,8 +739,12 @@ class multi_galaxy_siblings:
 				dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
 				mus,muerrs,SNe,Sg = dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,dfgal.shape[0]
 				if PAR=='mu':	fullerrors = np.array([plot_sigma0**2 + err**2 for err in muerrs])**0.5
-				xgs  = np.array([mini_d*(ss-(Sg-1)/2) for ss in range(Sg)]) + x_coords[igal]
+				xgs   = np.array([mini_d*(ss-(Sg-1)/2) for ss in range(Sg)]) + x_coords[igal]
 				mubar = np.average(mus) if g_or_z=='g' or PAR!='mu' else cosmo.distmod(x_coords[igal]).value
+				#Add sigmaext error for HRs
+				if g_or_z=='z' and PAR=='mu':
+					mu_full_errs = np.array([get_muext_err(zhelerr,x_coords[igal])**2+muerr**2 for muerr,zhelerr in zip(muerrs,dfgal['zhelio_errs'].values)])**0.5
+
 				#For each SN
 				for mu,err,ss in zip(mus,muerrs,np.arange(Sg)):
 					#Choice of labelling for legend/SNe
@@ -691,11 +759,11 @@ class multi_galaxy_siblings:
 						#e95 = float(dfsummaries[dfsummaries['SN']==SNe[ss]][f'{PAR}95'].values[0])
 						#fig.axes[0].errorbar(xgs[ss],point-mubar*subtract_mean,yerr=[[e95*bunchindex],[e95*(1-bunchindex)]],     color=colours[igal],marker=markers[igal],markersize=0,alpha=alpha,elinewidth=elw,markeredgewidth=mew          		  linestyle='none',capsize=capsize*0.5, elinewidth=0.25)
 					else:
+						if g_or_z=='z' and PAR=='mu':#Overlay sigmaext
+							fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=mu_full_errs[ss],color=colours[igal],marker=None,markersize=0,alpha=0.5,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
 						fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=err,     										color=colours[igal],marker=markers[igal],markersize=markersize,alpha=alpha,elinewidth=elw,markeredgewidth=mew,          linestyle='none',capsize=capsize, label=lab)
-
 					#Potential to add in distance errors with total intrinsic scatter
 					if plot_full_errors and PAR=='mu':	fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=fullerrors[ss], color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
-
 
 					if annotate_mode=='text':
 						dd,ha = self.get_dxgs(Sg,ss,g_or_z)#For SN labelling
@@ -737,11 +805,20 @@ class multi_galaxy_siblings:
 			zworddict = dict(zip(['zHD_hats','zcmb_hats'],[r"$z_{\rm{HD}}$",r"$z_{\rm{CMB}}$"]))
 			fig.axes[-1].set_xlabel(zworddict[zword],fontsize=self.FS)
 			fig.axes[-1].set_xlim([0,self.dfmus[zword].max()+0.01])
+
 		if annotate_mode=='legend':
 			#If/else because latter is weird fig rescaling for single panel plot
-			if not multiplot:	fig.axes[0].legend(fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+			if not multiplot:
+				if g_or_z=='z':#Remove errorbars from legend
+					lines, labels = fig.axes[-1].get_legend_handles_labels()
+					lines = [h[0] if isinstance(h, container.ErrorbarContainer) else h for h in lines]
+					fig.axes[0].legend(lines,labels,fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+				else:
+					fig.axes[0].legend(fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
 			else:
 				lines, labels = fig.axes[-1].get_legend_handles_labels()
+				if g_or_z=='z':#Remove errorbars from legend
+					lines = [h[0] if isinstance(h, container.ErrorbarContainer) else h for h in lines]
 				fig.legend(lines, labels, fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
 
 		#if multiplot:
