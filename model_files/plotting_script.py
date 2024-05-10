@@ -10,7 +10,7 @@ Contains:
 Functions:
 	kde(x_data, x_target, y_data=None, y_target=None, x_bounds=None, y_bounds=None, smoothing=1.0)
 	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey)
-	get_Lines(stan_data, c_light, alt_prior)
+	get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel)
 
 POSTERIOR_PLOTTER class:
 	inputs: samples, parnames, parlabels, bounds, Rhats, choices, smoothing=2
@@ -675,7 +675,7 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey):
 	if show:
 		pl.show()
 
-def get_Lines(stan_data, c_light, alt_prior):
+def get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel):
 	"""
 	Get Lines
 
@@ -691,6 +691,12 @@ def get_Lines(stan_data, c_light, alt_prior):
 
 	alt_prior : bool
 		choice of sigmaCommon prior
+
+	zcosmo : str
+		choice of zHD or zcmb
+
+	alpha_zhel : bool (optional; default=False)
+		if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
 
 	Returns
 	----------
@@ -715,14 +721,14 @@ def get_Lines(stan_data, c_light, alt_prior):
 		fixed_sigmapec = False	;	sigmapec = None
 
 	if 'mu_ext_gal' in stan_data:
-		use_external_distances = True	;	muextstr = 'Used Ext. Distances'
+		use_external_distances = True	;	muextstr = r'Used $%s$-Distances'%({'zHD':'\\hat{z}_{\\rm{HD}}','zcmb':'\\hat{z}_{\\rm{CMB}}'}[zcosmo])
 	elif 'zhelio_hats' in stan_data:
-		use_external_distances = True   ;   muextstr = 'Used Redshift Estimates'
+		use_external_distances = True   ;   muextstr = r'Modelled $%s$ Parameters'%({'zHD':'z_{\\rm{HD}}','zcmb':'z_{\\rm{CMB}}'}[zcosmo])
 	else:
 		use_external_distances = False	;	muextstr = 'No Ext. Distances'
 
-
-
+	if alpha_zhel:
+		alpha_zhel_str = r'Modelled $\epsilon_{\mu} = \hat{\alpha} \epsilon_{z_{\rm{Helio}}}$ for %s Galaxies'%(stan_data['Nzhelgal'])
 
 	def add_siblings_galaxies(Ng, S_g):
 		if type(S_g) in [float, int]:
@@ -783,5 +789,7 @@ def get_Lines(stan_data, c_light, alt_prior):
 	if use_external_distances:
 		Lines = add_sigma_Line(Lines, fixed_sigmapec, '\\rm{pec}',sigmapec, 'c', 'km s$^{-1}$')
 	Lines.append(muextstr)
+	if alpha_zhel:
+		Lines.append(alpha_zhel_str)
 
 	return Lines
