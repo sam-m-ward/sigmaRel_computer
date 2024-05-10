@@ -173,7 +173,7 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     #print (dfmus['zHD_hats'] - dfmus.groupby('Galaxy')['zHD_hats'].transform('mean'))
     dfmus['zcmb_hats']  = dfmus.groupby('Galaxy')['zcmb_hats'].transform('mean')#Simply take the mean in each Galaxy
     dfmus['zHD_hats']   = dfmus.groupby('Galaxy')['zHD_hats'].transform('mean')#Simply take the mean in each Galaxy
-    dfmus['muext_hats'] = dfmus[['zhelio_hats','zHD_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+    #dfmus['muext_hats'] = dfmus[['zhelio_hats','zHD_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
     #########################
     '''
     #Examine correlation of zhelio and zcmbs, simulate gaussian zhels, compute zcmbs, then compute their correlation
