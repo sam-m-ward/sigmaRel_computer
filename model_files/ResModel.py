@@ -297,7 +297,7 @@ class ResModelLoader:
 
 			#Initialise and fit model
 			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
-			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init)
+			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init, seed=42)
 			df          = fit.draws_pd()
 
 			#Thin samples
