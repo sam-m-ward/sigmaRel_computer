@@ -8,7 +8,7 @@ siblings_galaxy class same as multi_galaxy class but just for a single siblings 
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True
+	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}
 
 	Methods are:
 		create_paths()
@@ -16,7 +16,7 @@ multi_galaxy class:
 		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
-		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False)
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False,zcosmo='zHD')
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False)
 		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
@@ -85,6 +85,25 @@ class multi_galaxy_siblings:
 		pars = [cc.split('_errs')[0] for cc in cols if '_errs' in cc and f"{cc.split('_errs')[0]}s" in cols]
 		self.parcols = [cc+{0:'s',1:'_errs'}[_] for cc in pars for _ in range(2)]
 
+	def get_redshift_distances(self):
+		"""
+		Get Redshift Distances
+
+		Take fiducial cosmology and compute mu_ext columns using redshifts
+
+		End Product(s)
+		----------
+		self.cosmo, self.redshift_cols: the astropy cosmology model, and the redshift columsn in dfmus of ['zHD_hats','zcmb_hats']
+
+		dfmus[['muext_zHD_hats','muext_zcmb_hats']] computed using cosmo
+		"""
+		self.cosmo = FlatLambdaCDM(**self.fiducial_cosmology)
+		self.redshift_cols = [col for col in ['zHD_hats','zcmb_hats'] if col in self.dfmus.columns]
+		assert('zhelio_hats' in self.dfmus.columns)
+		for zcol in self.redshift_cols:
+			assert(zcol.split('_hats')[0]+'_errs' in self.dfmus.columns)#Check errors in either/both of zHD and zcmb are there
+			self.dfmus[f'muext_{zcol}'] = self.dfmus[['zhelio_hats',zcol]].apply(lambda z: self.cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+
 	def print_table(self, PARS=['mu','AV','theta','RV'],verbose=False,returner=False):
 		"""
 		Print Tables
@@ -135,7 +154,7 @@ class multi_galaxy_siblings:
 
 
 
-	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True):
+	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}):
 		"""
 		Initialisation
 
@@ -169,12 +188,17 @@ class multi_galaxy_siblings:
 
 		verbose: bool (optional; default=True)
 			if True, print input dataframe
+
+		fiducial_cosmology : dict (optional; default={'H0':73.24,'Om0':0.28})
+			cosmo parameters used in astropy FlatLambdaCDM for creating external redshift-based distances
 		"""
 		#Data
 		self.dfmus      = dfmus
 		self.samplename = samplename
 		self.dfmus.sort_values(['Galaxy','SN'],ascending=True,inplace=True)
 		self.infer_pars()
+		self.fiducial_cosmology = fiducial_cosmology
+		self.get_redshift_distances()
 
 		#Input Posterior Parameters
 		self.master_parnames  = ['mu','AV','theta','RV']
@@ -264,7 +288,7 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False):
 		"""
 		sigmaRel Sampler
 
@@ -310,14 +334,22 @@ class multi_galaxy_siblings:
 		blind : bool (optional; default=False)
 			option to mask posterior results
 
+		zcosmo : str (optional; default='zHD')
+			choice of whether cosmology redshift is flow-corrected zHD_hats or un-flow-corrected zcmb_hats
+
+		alpha_zhel : bool (optional; default=False)
+			if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
+
 		End Product(s)
 		----------
 		self.FIT, posterior samples saved in self.productpath
 		"""
 		if alt_prior and sigma0!='free':
 			raise Exception('Cannot use alternative prior and while not freeing sigma0')
+		if alpha_zhel and not zmarg:
+			raise Exception('Cannot activate alpha_zhel mode with mu-pipeline; please set zmarg=True')
 		#Initialise model with choices
-		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, self)
+		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, self)
 		#Get values, either default or user input
 		modelloader.get_model_params()
 		#Get string name for creating/saving files and models
@@ -338,7 +370,7 @@ class multi_galaxy_siblings:
 
 			#Initialise and fit model
 			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
-			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init)
+			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init, seed=42)
 			df          = fit.draws_pd()
 
 			#Thin samples
@@ -408,7 +440,7 @@ class multi_galaxy_siblings:
 		----------
 		Plot
 		"""
-
+		'''#This code is now outdated, thus for now make sure to use plot_posterior_samples after sigmaRel sampler
 		#Get pars to plot
 		if 'modelkey' not in self.__dict__:
 			modelloader = ModelLoader(self.sigma0, self.sigmapec, self.eta_sigmaRel_input, self.use_external_distances, self)
@@ -417,6 +449,7 @@ class multi_galaxy_siblings:
 			self.update_attributes(modelloader)
 			self.pars   = modelloader.get_pars()
 		self.get_parlabels(self.pars)
+		#'''
 
 		#Get posterior samples
 		if 'FIT' in self.__dict__.keys():
@@ -429,6 +462,7 @@ class multi_galaxy_siblings:
 
 		#Get posterior data
 		df         = FIT['chains'] ; fitsummary = FIT['summary'] ; stan_data  = FIT['data'] ; modelloader = FIT['modelloader']
+		self.get_parlabels(modelloader.get_pars())
 		Rhats      = {par:fitsummary.loc[par]['r_hat'] for par in self.dfparnames}
 		samples    = {par:np.asarray(df[par].values)   for par in self.dfparnames}
 		print ('Rhats:',Rhats)
@@ -439,7 +473,7 @@ class multi_galaxy_siblings:
 		Summary_Strs = postplot.corner_plot(verbose=not blind,blind=blind)#Table Summary
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
-		finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior),save,show,self.plotpath,savekey)
+		finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel),save,show,self.plotpath,savekey)
 
 		#Return posterior summaries
 		if returner: return Summary_Strs
@@ -720,8 +754,8 @@ class multi_galaxy_siblings:
 		else:
 			raise Exception(f"Require g_or_z in [g,z], but got {g_or_z}")
 
-		def get_muext_err(sigz,zHD):
-			return 5*sigz/(np.log(10)*zHD)
+		def get_muext_err(sigz,zbar):
+			return 5*sigz/(np.log(10)*zbar)
 
 		for iax,PAR in enumerate(PARS):
 			subtract_mean = {'mu':True,'theta':False,'AV':False,'RV':False,'etaAV':False}[PAR] if subtract_g_mean is None else subtract_g_mean
@@ -1093,7 +1127,7 @@ class siblings_galaxy:
 				print (f"Beginning Stan fit adopting the dM-{mode.capitalize()} assumption")
 				stan_data = dict(zip(['S','sigma0','mean_mu','mu_s','mu_err_s'],[self.Sg,self.sigma0,np.average(self.mus),self.mus,self.errors]))
 				model = CmdStanModel(stan_file=self.stanpath+stan_files[mode])
-				fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup)
+				fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, seed=42)
 				fitsummary  = az.summary(fit)
 				df          = fit.draws_pd()
 				STORE[mode] = {'median':round(df['mu'].median(),3),'std':round(df['mu'].std(),3)}
