@@ -8,7 +8,7 @@ Methods are useful for preparing data and model before posterior computation
 Contains:
 --------------------
 ModelLoader class:
-	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, choices
+	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, choices
 
 	Methods are:
 		get_model_params()
@@ -27,7 +27,7 @@ import numpy as np
 
 class ModelLoader:
 
-	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, choices):
+	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, choices):
 		"""
 		Initialisation
 
@@ -55,6 +55,12 @@ class ModelLoader:
 			two choices of prior are [sigma0~Prior and sigmaRel~U(0,sigma0)] OR [sigmaRel~Prior; sigmaCommon~Prior]
 			alt_prior=False is former, alt_prior=True is latter
 
+		zcosmo : str
+			choice of zHD or zcmb
+
+		alpha_zhel : bool (optional; default=False)
+			if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
+
 		choices : class
 			class with attributes with pre-defined values (user input or None)
 		"""
@@ -64,6 +70,8 @@ class ModelLoader:
 		self.use_external_distances = use_external_distances
 		self.zmarg					= zmarg
 		self.alt_prior              = alt_prior
+		self.zcosmo                 = zcosmo
+		self.alpha_zhel             = alpha_zhel
 
 		self.choices  = copy.deepcopy(choices) #Choices inputted in class call
 		self.stanpath = self.choices.stanpath
@@ -132,7 +140,7 @@ class ModelLoader:
 			else:
 				raise Exception(f"{label} must be float/int >0 or 'free', but {label}={value}")
 			sigmas[label]['str'] = sigmastr
-		muextstr = {False:'no_muext',True:'with_muext'}[self.use_external_distances]
+		muextstr = {False:'no_muext',True:f'with_muext{self.zcosmo}'}[self.use_external_distances]
 
 		#Model being used
 		modelkey = f"{sigmas['sigma0']['str']}_{muextstr}"
@@ -152,6 +160,9 @@ class ModelLoader:
 		if self.zmarg:
 			print ("Marginalising over z_g parameters")
 			modelkey += f"_zmarg"
+			if self.alpha_zhel:
+				print ("Marginalising over large zhelio error galaxies")
+				modelkey += f"_alphazhelio"
 		if self.alt_prior:
 			print (f"Using Alternative Prior")
 			modelkey += f"_altprior"
@@ -214,7 +225,7 @@ class ModelLoader:
 		Parameters
 		----------
 		dfmus : pandas Dataframe
-			data, columns are ['Galaxy','SN','mus','mu_errs','muext_hats','zcmb_hats','zcmb_errs']
+			data, columns are ['Galaxy','SN','mus','mu_errs','muext_hats','zcosmo_hats','zcosmo_errs']
 
 		Returns
 		----------
@@ -222,13 +233,15 @@ class ModelLoader:
 		 	dictionary with data to fit
 		"""
 		#Cosmo for marginalising over z and computing luminosity distances in model
-		H0 = 73.24 ; Om0 = 0.28 ; Ol0 = 0.72 ; c_light = 299792458
-		q0 = Om0/2 - Ol0 ; j0 = Om0 + Ol0 ; c_H0 = c_light/(H0*1e3)
+		#H0 = 73.24 ; Om0 = 0.28 ; Ol0 = 0.72 ; c_light = 299792458
+		c_light = self.choices.c_light ; H0  = self.choices.fiducial_cosmology['H0'] ; Om0 = self.choices.fiducial_cosmology['Om0']
+		Ol0 = 1-Om0
+		q0  = Om0/2 - Ol0 ; j0 = Om0 + Ol0 ; c_H0 = c_light/(H0*1e3)
 
 		print ('###'*30)
 		print (f"Beginning Stan fit: {self.modelkey}")
 		#Groupby galaxy to count Nsibs per galaxy
-		Gal   = dfmus.groupby('Galaxy',sort=False)[['muext_hats','zcmb_hats','zcmb_errs','zhelio_hats']].agg('mean')
+		Gal   = dfmus.groupby('Galaxy',sort=False)[[f'muext_{self.zcosmo}_hats',f'{self.zcosmo}_hats',f'{self.zcosmo}_errs','zhelio_hats']].agg('mean')
 		Ng    = Gal.shape[0]
 		S_g   = dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
 		Nsibs = int(sum(S_g))
@@ -238,21 +251,35 @@ class ModelLoader:
 		mu_sib_phots     = dfmus['mus'].values
 		mu_sib_phot_errs = dfmus['mu_errs'].values
 		#External Distances
-		mu_ext_gal, zcmbs, zcmberrs, zhelios = [Gal[col].tolist() for col in Gal.columns]
+		mu_ext_gal, zcosmos, zcosmoerrs, zhelios = [Gal[col].tolist() for col in Gal.columns]
 
 		def etamapper(x): return 0 if x is None else x
 		#Load up data
-		stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcmbs','zcmberrs','sigmaRel_input','eta_sigmaRel_input'],
-							 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcmbs , zcmberrs , self.sigmaRel_input , etamapper(self.eta_sigmaRel_input) ]))
+		stan_data = dict(zip(['Ng','S_g','Nsibs','mu_sib_phots','mu_sib_phot_errs','mu_ext_gal','zcosmos','zcosmoerrs','sigmaRel_input','eta_sigmaRel_input'],
+							 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcosmos , zcosmoerrs , self.sigmaRel_input , etamapper(self.eta_sigmaRel_input) ]))
 		if not self.use_external_distances or self.zmarg:
-			stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcmbs','zcmberrs']}
+			stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcosmos','zcosmoerrs']}
 		#if self.alt_prior:
 		#	stan_data = {key:value for key,value in stan_data.items() if key not in ['sigmaRel_input','eta_sigmaRel_input']}
 		if self.zmarg:#stan_data['zg_data']     = zcmbs#stan_data['zgerrs_data'] = zcmberrs#stan_data['zg_data']     = [np.array([zh,zc]) for zh,zc in zip(zcmbs, zhelios)]#stan_data['zgerrs_data'] = [np.ones((2,2))*ze for ze in zcmberrs]#Assume measurements errors on zcmb and zhelio are the same, and they are perfectly correlated
 			stan_data['zhelio_hats'] = zhelios
-			stan_data['zpo_hats']    = np.asarray(zhelios)-np.asarray(zcmbs)
-			stan_data['zhelio_errs'] = zcmberrs#Assume measurements errors on zcmb and zhelio are the same, and they are perfectly correlated
+			stan_data['zpo_hats']    = np.asarray(zhelios)-np.asarray(zcosmos)
+			stan_data['zhelio_errs'] = zcosmoerrs#Assume measurements errors on zcosmo and zhelio are the same, and they are perfectly correlated
 			stan_data['q0'] = q0 ; stan_data['j0'] = j0 ; stan_data['c_H0'] = c_H0
+
+			if self.alpha_zhel:
+				zhel_sibs = dfmus[dfmus['alpha_mu_z']!=0].index
+				zhel_sibs_indices = [_ for _,sn in enumerate(dfmus.index) if sn in zhel_sibs]
+				stan_data['Nzhel']      = int(len(zhel_sibs))
+				stan_data['Nzhelgal']   = dfmus.loc[zhel_sibs]['Galaxy'].nunique()#Purely for plotting purposes to describe how many galaxies were modelled this way
+				stan_data['alpha_zhel'] = dfmus.loc[zhel_sibs]['alpha_mu_z'].to_list()
+				Qsz = np.zeros((stan_data['Nsibs'],stan_data['Nzhel']))
+				for _ in range(dfmus.shape[0]):
+					if _ in zhel_sibs_indices:
+						Qsz[_,zhel_sibs_indices.index(_)] = 1
+				stan_data['Q_sib_zhel'] = Qsz
+			else:
+				stan_data['Nzhel'] = 0 ; stan_data['Nzhelgal'] = 0; stan_data['alpha_zhel'] = [] ; stan_data['Q_sib_zhel'] = np.zeros((stan_data['Nsibs'],0))
 
 		if self.sigma0!='free':
 			stan_data['sigma0']    = self.sigma0
@@ -285,8 +312,8 @@ class ModelLoader:
 			jsons files with initialisations
 		"""
 		if self.zmarg:#zh_guesses = dfmus.groupby('Galaxy')['zhelio_hats'].agg('mean').to_numpy()#zg_param_guesses = np.vstack((zh_guesses,zc_guesses)).T#zg_param_guesses = dfmus.groupby('Galaxy')[['zhelio_hats','zcmb_hats']].agg('mean').to_numpy().tolist()#json_file = {'zg_param':zg_param_guesses,'pec_unity':250/3e5}#,'nuhelio':np.ones(stan_data['Ng']).tolist()}
-			zc_guesses = dfmus.groupby('Galaxy')['zcmb_hats'].agg('mean').to_numpy().tolist()
-			json_file = {'zHDs':zc_guesses,'pec_unity':250/3e5}
+			zc_guesses = dfmus.groupby('Galaxy')[f'{self.zcosmo}_hats'].agg('mean').to_numpy().tolist()
+			json_file = {'zcosmos':zc_guesses,'pec_unity':250/3e5}
 		else:
 			json_file = {}
 
