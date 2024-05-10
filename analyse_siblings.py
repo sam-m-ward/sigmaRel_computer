@@ -33,9 +33,22 @@ err=1/0
 from load_data import *
 dfmus = load_dfmus('ZTFtest5')
 
-#print (dfmus[dfmus['zhelio_errs']==0.01][['SN','zhelio_hats','zhelio_errs','zHD_hats','zHD_errs']])
-print (dfmus[['SN','zhelio_hats','zhelio_errs','zHD_hats','zHD_errs']])
+'''#Inspect HRs/Flow Corrections
+print (dfmus[dfmus['zhelio_errs']>=0.001][['SN','Galaxy','zhelio_hats','zhelio_errs','zHD_hats','zHD_errs']])
+#print (dfmus[['SN','zhelio_hats','zhelio_errs','zHD_hats','zHD_errs']])
+from astropy.cosmology import FlatLambdaCDM
+cosmo  = FlatLambdaCDM(H0=73.24,Om0=0.28)
+#dfmus = dfmus[dfmus['zhelio_errs']<0.001]
+dfmus['muext_hats'] = dfmus[['zhelio_hats','zcmb_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+dfmus['HRs'] = dfmus[['muext_hats','mus']].apply(lambda x: x[1]-x[0],axis=1)
+#dfmus['HRs'] = dfmus[['mu_cosmicflows','mus']].apply(lambda x: x[1]-x[0],axis=1)
+print (dfmus['HRs'].median(), dfmus['HRs'].std())
 
+dfmus['muext_hats'] = dfmus[['zhelio_hats','zHD_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+dfmus['HRs'] = dfmus[['muext_hats','mus']].apply(lambda x: x[1]-x[0],axis=1)
+print (dfmus['HRs'].median(), dfmus['HRs'].std())
+err=1/0
+'''
 
 #APPLY FILTERING
 ##COSMO SAMPLE
@@ -51,8 +64,14 @@ print (dfmus[['SN','zhelio_hats','zhelio_errs','zHD_hats','zHD_errs']])
 
 #ANALYSE
 multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True)
+multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],alpha_zhel=False,blind=True,save=True,show=False)
 
-multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],blind=True,save=True,show=False)
+'''#Overlay analytic sigmaRel posteriors for different treatments of alpha_zhel
+fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
+pl.title(r'$\sigma_{\rm{Rel}}$-Posterior from Individual Distance Estimates',fontsize=multigal.FS+1, weight='bold')
+fig,ax,kmax = multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],blind=True,alpha_zhel=False,fig_ax=[fig,ax,0,r'Ignore $\mu(z_{\rm{Helio}})$ Dep.'],save=False,show=False)
+fig,ax,kmax = multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],blind=True,alpha_zhel=True,fig_ax=[fig,ax,1,r'Incl. $\mu(z_{\rm{Helio}})$ Dep.',kmax],save=True,show=False)
+#'''
 
 
 '''#Overlay analytic sigmaRel posteriors for different samples
@@ -64,18 +83,20 @@ fig,ax,kmax = multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper
 #'''
 
 
-
 #multigal.print_table()
 #multigal.plot_parameters(['mu','AV','theta'])
-'''
+'''#Plotting Parameters
 multigal.plot_parameters(['mu','theta','AV'],g_or_z = 'g', subtract_g_mean=None)
 multigal.plot_parameters('mu',g_or_z = 'g')
 multigal.plot_parameters(['mu','theta','AV'],g_or_z = 'z')
 #'''
-#multigal.plot_parameters('mu',g_or_z = 'z',zword='zHD_hats')
+'''#Plotting HRs
+multigal.plot_parameters('mu',g_or_z = 'z',zword='zHD_hats')
 multigal.plot_parameters('mu',g_or_z = 'z',zword='zcmb_hats')
+multigal.plot_delta_HR()
 err=1/0
+#'''
 #multigal.n_warmup   = 2000 ; multigal.n_sampling = 8000
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior=True,overwrite=True,blind=True)
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior=True,overwrite=True,blind=True,zcosmo='zcmb',alpha_zhel=False)
 multigal.plot_posterior_samples(blind=True)
 #'''
