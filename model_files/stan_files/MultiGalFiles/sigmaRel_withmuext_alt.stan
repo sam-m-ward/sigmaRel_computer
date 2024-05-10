@@ -7,8 +7,8 @@ data {
     vector[Nsibs] mu_sib_phot_errs;
 
     vector[Ng] mu_ext_gal;
-    vector[Ng] zcmbs;
-    vector[Ng] zcmberrs;
+    vector[Ng] zcosmos;
+    vector[Ng] zcosmoerrs;
 
     //real<lower=0,upper=1> sigma0;    //Data
     //real<lower=0,upper=1> pec_unity; //Data
@@ -16,7 +16,7 @@ data {
 transformed data{
   vector[Ng] mu_ext_gal_err_prefac;
   for (n in 1:Ng){
-    mu_ext_gal_err_prefac[n] = 5/(log(10)*zcmbs[n]);
+    mu_ext_gal_err_prefac[n] = 5/(log(10)*zcosmos[n]);
   }
 }
 parameters {
@@ -36,7 +36,7 @@ transformed parameters {
     vector[Nsibs] dM_sibs;
 
     vector[Ng] mu_ext_gal_errs;
-    mu_ext_gal_errs = mu_ext_gal_err_prefac .* sqrt(square(pec_unity)+square(zcmberrs));
+    mu_ext_gal_errs = mu_ext_gal_err_prefac .* sqrt(square(pec_unity)+square(zcosmoerrs));
 
     dM_rel    = eta_dM_rel*sigmaRel;
     dM_common = eta_dM_common*sigmaCommon;

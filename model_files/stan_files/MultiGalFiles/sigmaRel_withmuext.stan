@@ -7,8 +7,8 @@ data {
     vector[Nsibs] mu_sib_phot_errs;
 
     vector[Ng] mu_ext_gal;
-    vector[Ng] zcmbs;
-    vector[Ng] zcmberrs;
+    vector[Ng] zcosmos;
+    vector[Ng] zcosmoerrs;
 
     real<lower=0,upper=1> sigmaRel_input;      //Option to fix sigmaRel at a fraction of sigma0, if 0, don't fix, if 1, fix
     real<lower=0,upper=1> eta_sigmaRel_input;  //The fraction of sigma0, e.g. eta_sigmaRel_input=0.5 is sigmaRel = sigma0/2
@@ -19,7 +19,7 @@ data {
 transformed data{
   vector[Ng] mu_ext_gal_err_prefac;
   for (n in 1:Ng){
-    mu_ext_gal_err_prefac[n] = 5/(log(10)*zcmbs[n]);
+    mu_ext_gal_err_prefac[n] = 5/(log(10)*zcosmos[n]);
   }
 }
 parameters {
@@ -40,7 +40,7 @@ transformed parameters {
     real sigmaRel;
 
     vector[Ng] mu_ext_gal_errs;
-    mu_ext_gal_errs = mu_ext_gal_err_prefac .* sqrt(square(pec_unity)+square(zcmberrs));
+    mu_ext_gal_errs = mu_ext_gal_err_prefac .* sqrt(square(pec_unity)+square(zcosmoerrs));
 
     if (sigmaRel_input!=0) {
       sigmaRel = eta_sigmaRel_input*sigma0;
