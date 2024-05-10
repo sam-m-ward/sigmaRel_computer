@@ -18,7 +18,7 @@ multi_galaxy class:
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False,zcosmo='zHD')
 		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False)
-		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None)
+		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
 		plot_delta_HR(save=True,show=False)
@@ -480,7 +480,7 @@ class multi_galaxy_siblings:
 
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],show=False,save=True,blind=False,fig_ax=None):
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
@@ -493,6 +493,9 @@ class multi_galaxy_siblings:
 
 		prior_upper_bounds : list (optional; default=[1.0])
 			choices of sigmaRel prior upper bound
+
+		alpha_zhel : bool (optional; default=False)
+			When true, this takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this (at present valid only for Nsib=2 galaxies)
 
 		show : bool (optional; default=False)
 			bool to show plots or not
@@ -516,6 +519,19 @@ class multi_galaxy_siblings:
 		self.sigRs_store: dict
 		 	same as self.total_posteriors, but the sigR prior grid
 		"""
+		def zhel_modify(dfgal):#Takes Nsiblings=2 galaxy, selects the sibling with the larger fitting error, and adds the muphot_zhelio uncorrelated error component
+			#print ('Before:', dfgal[['alpha_mu_z',f'{PAR}_errs']])
+			if dfgal['alpha_mu_z'].nunique()>1 and dfgal['alpha_mu_z'].values[0]!=0:#if this siblings galaxy has a large zhelio error and thus has alpha estimated
+				if dfgal.shape[0]!=2:
+					raise Exception('Simple analytic trick for incorporating muphot-zhelio errors only works for Nsiblings=2 per galaxy; easiest workaround is to sample posterior')
+				else:
+					delta_alpha = abs(dfgal['alpha_mu_z'].iloc[0]-dfgal['alpha_mu_z'].iloc[1])
+					imod_sib    = 0 if dfgal['alpha_mu_z'].iloc[0]>dfgal['alpha_mu_z'].iloc[1] else 1#The sibling with the larger alpha
+					new_sigmafit = (dfgal[f'{PAR}_errs'].iloc[imod_sib]**2 + (dfgal['alpha_mu_z'].iloc[imod_sib]*dfgal['zhelio_errs'].iloc[imod_sib])**2 )**0.5
+					dfgal.loc[dfgal.index.values[imod_sib],f'{PAR}_errs'] = new_sigmafit
+			#print ('After:', dfgal[['alpha_mu_z',f'{PAR}_errs']])
+			return dfgal
+
 		#List of prior upper bounds to loop over
 		self.prior_upper_bounds = prior_upper_bounds
 
@@ -523,7 +539,8 @@ class multi_galaxy_siblings:
 		total_posteriors = {p:1 for p in self.prior_upper_bounds} ; sigRs_store = {}
 		#For each galaxy, compute sigmaRel likelihood
 		for g,gal in enumerate(self.dfmus['Galaxy'].unique()):
-			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]												#Use dummy value for sigma0
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal].copy()
+			if alpha_zhel: dfgal = zhel_modify(dfgal)														#Use dummy value for sigma0
 			sibgal = siblings_galaxy(dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,gal,sigma0=0.1,prior_upper_bounds=self.prior_upper_bounds)
 			sibgal.get_sigmaRel_posteriors()
 			for p in self.prior_upper_bounds:
@@ -531,7 +548,6 @@ class multi_galaxy_siblings:
 				if g==0:
 					total_posteriors[p] *= 1/p#Prior only appears once
 					sigRs_store[p] = sibgal.sigRs_store[p]
-
 		#Plot posteriors
 		if self.verbose:
 			#Use single-galaxy class for plotting
