@@ -5,7 +5,8 @@ from scipy.special import erfinv
 import pickle
 from contextlib import suppress
 from astropy.cosmology import FlatLambdaCDM
-
+from sklearn.linear_model import LinearRegression
+import json
 
 from numpy import pi, sin, cos, arctan2, hypot
 def heliocorr(zhel, RA, Dec):
@@ -142,27 +143,34 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     #Get ra, dec
     df_radeczhel = pd.read_csv('../../bayesn_for_ztf/bayesn-pre-release-dev/bayesn-data/lcs/meta/ztf_dr2_RADec_zhelio_roughestimates.txt',names=['SN','ra','dec','z_helio'],sep='\s')
     df_radeczhel.set_index('SN',inplace=True)
-    df_radeczhel.loc['ZTF20abmarcv_1'] = df_radeczhel.loc['ZTF20abmarcv'].iloc[0]
+    df_radeczhel.loc['ZTF20abmarcv_1'] = df_radeczhel.loc['ZTF20abmarcv'].iloc[0]#Two siblings on same pixel, introduce as new SNe
     df_radeczhel.loc['ZTF20abmarcv_2'] = df_radeczhel.loc['ZTF20abmarcv'].iloc[0]
+    #print (df_radeczhel)
     sng = sng.merge(df_radeczhel[['ra','dec']],left_index=True,right_index=True,how='left').loc[sng.index]
-
+    #print (sng)
     #Add to dfmus, then compute zcmbs
     dfmus = dfmus.merge(sng[['zhelio_hats','zhelio_errs','ra','dec']],left_index=True,right_index=True,how='left').loc[dfmus.index]
+    #print (dfmus)
     dfmus['zcmb_hats']  = dfmus[['zhelio_hats','ra','dec']].apply(lambda x: heliocorr(x[0],x[1],x[2]),axis=1)#zcmb by correcting zhelio for cmb dipole
 
     #Get text file for use in cosmic flows
-    dfmus[['l','b']] = dfmus[['ra','dec','zcmb_hats']].apply(lambda x: get_l_b(x[0],x[1]),axis=1,result_type='expand')
     try:
-        df_flowcorr = pd.read_csv('products/table_for_cosmicflows_out.txt',skiprows=17,header=None,names=['l','b','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
+        #df_flowcorr = pd.read_csv('products/table_for_cosmicflows_out.txt',skiprows=17,header=None,names=['long','lat','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
+        df_flowcorr = pd.read_csv('products/table_for_cosmicflows_v_out.txt',skiprows=17,header=None,names=['long','lat','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
         assert(df_flowcorr.shape[0]==dfmus.shape[0])
         dfmus.loc[:,'zHD_hats'] = df_flowcorr['vHD'].values/299792.458
+        dfmus.loc[:,'mu_cosmicflows'] = 5*np.log10(df_flowcorr['DL'].values)+25
     except:
-        dfmus[['l','b','zcmb_hats']].to_csv('products/table_for_cosmicflows.txt',index=False,header=None,sep=' ')
+        #dfmus[['l','b']] = dfmus[['ra','dec','zcmb_hats']].apply(lambda x: get_l_b(x[0],x[1]),axis=1,result_type='expand')
+        #dfmus[['l','b','zcmb_hats']].to_csv('products/table_for_cosmicflows.txt',index=False,header=None,sep=' ')
+        #dfmus[['ra','dec','zcmb_hats']].to_csv('products/table_for_cosmicflows.txt',index=False,header=None,sep=' ')
+        dfmus['vcmb_hats'] = dfmus['zcmb_hats']*299792.458
+        dfmus[['ra','dec','vcmb_hats']].to_csv('products/table_for_cosmicflows_v.txt',index=False,header=None,sep=' ')
         raise Exception('Please take products/table_for_cosmicflows.txt and upload to https://cosmicflows.iap.fr/table_query/ using J2000 galactic coords and velocity in c \n save as products/table_for_cosmicflows_out.txt')
 
     #For simplicity, take mean of zcmb and zHD (and zhelio is already same for both sibs)
-    print ('Taking mean of zHD, differences between original and new should be negligible:')
-    print (dfmus['zHD_hats'] - dfmus.groupby('Galaxy')['zHD_hats'].transform('mean'))
+    #print ('Taking mean of zHD, differences between original and new should be negligible:')
+    #print (dfmus['zHD_hats'] - dfmus.groupby('Galaxy')['zHD_hats'].transform('mean'))
     dfmus['zcmb_hats']  = dfmus.groupby('Galaxy')['zcmb_hats'].transform('mean')#Simply take the mean in each Galaxy
     dfmus['zHD_hats']   = dfmus.groupby('Galaxy')['zHD_hats'].transform('mean')#Simply take the mean in each Galaxy
     dfmus['muext_hats'] = dfmus[['zhelio_hats','zHD_hats']].apply(lambda z: cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
@@ -179,6 +187,27 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
         return np.corrcoef(x)[1,0]
     dfmus['z_hel_cmb_cov'] = dfmus[['zhel_samps','zcmb_samps']].apply(get_cov,axis=1)
     #'''
+    #########################
+    #Get mu vs. zhelio alpha-slope estimates from zhelio grid; linear OLS fit
+    dfmus.loc[:,'alpha_mu_z'] = 0
+    try:
+        dzhel_to_load = [0.01]
+        for dzh in dzhel_to_load:
+            df_zgrid = pd.read_csv(f'products/sens_to_zhel/mu_dz{dzh}.csv').set_index('sn',drop=True)
+            dzhels = list(df_zgrid.columns)
+            for sn in df_zgrid.index:
+                ys = []
+                for iz,dzhel in enumerate(dzhels):
+                    mu  = float(json.loads(df_zgrid.loc[sn][dzhel])[0])
+                    mu0 = float(json.loads(df_zgrid.loc[sn]['0.0'])[0])
+                    ys.append(mu-mu0)
+
+                mo = LinearRegression(fit_intercept=False)
+                mo.fit(np.asarray(dzhels).astype(float).reshape(-1,1),ys)
+                mhat = mo.coef_[0]
+                dfmus.loc[sn,'alpha_mu_z']  = round(mhat,5)
+    except Exception as ee:
+        print (f'No photometric distances grid in zhelio and/or exception: {ee}')
     #########################
 
     #FINAL TOUCHES
