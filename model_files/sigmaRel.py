@@ -761,7 +761,15 @@ class multi_galaxy_siblings:
 					else:
 						if g_or_z=='z' and PAR=='mu':#Overlay sigmaext
 							fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=mu_full_errs[ss],color=colours[igal],marker=None,markersize=0,alpha=0.5,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
+							#Plot zcmb
+							zcmb = self.dfmus[self.dfmus['SN']==SNe[ss]]['zcmb_hats'].values[0]
+							fig.axes[iax].errorbar(xgs[ss]-x_coords[igal]+zcmb,mu-cosmo.distmod(zcmb).value,yerr=err,color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.2,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
+							mu_zcmb_full_errs = np.array([get_muext_err(zhelerr,zcmb)**2+muerr**2 for muerr,zhelerr in zip(muerrs,dfgal['zhelio_errs'].values)])**0.5
+							fig.axes[iax].errorbar(xgs[ss]-x_coords[igal]+zcmb,mu-cosmo.distmod(zcmb).value,yerr=mu_zcmb_full_errs[ss],color=colours[igal],marker=None,markersize=0,alpha=0.1,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
+
 						fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=err,     										color=colours[igal],marker=markers[igal],markersize=markersize,alpha=alpha,elinewidth=elw,markeredgewidth=mew,          linestyle='none',capsize=capsize, label=lab)
+
+
 					#Potential to add in distance errors with total intrinsic scatter
 					if plot_full_errors and PAR=='mu':	fig.axes[0].errorbar(xgs[ss],mu-mubar,yerr=fullerrors[ss], color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.4,linestyle='none',capsize=capsize)
 
