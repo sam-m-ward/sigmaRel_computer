@@ -17,7 +17,7 @@ multi_galaxy class:
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False,zcosmo='zHD')
-		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False)
+		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None)
 		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
@@ -407,7 +407,7 @@ class multi_galaxy_siblings:
 		#Print distance summaries
 		self.FIT  = FIT
 
-	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False):
+	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False, fig_ax=None):
 		"""
 		Plot Posterior Samples
 
@@ -435,6 +435,9 @@ class multi_galaxy_siblings:
 
 		blind : bool (optional; default=False)
 			option to mask posterior results
+
+		fig_ax : None or list (optional; default=None)
+			if None, create new figure, else, fig_ax = [fig,ax,counter,:index_in_lines_to_include,Legend Label, (optional kmax)], where counter denotes how many times figure has been used
 
 		End Product(s)
 		----------
@@ -469,14 +472,44 @@ class multi_galaxy_siblings:
 
 		#Corner Plot
 		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
-		postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
-		Summary_Strs = postplot.corner_plot(verbose=not blind,blind=blind)#Table Summary
+		if fig_ax is None:#Single Plot
+			postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
+			colour = None ; counter = 0; Npanel = 1; line_index = None ; multiplot = False ; y0 = None
+		else:
+			multiplot = True
+			if fig_ax[0] is None:#Multiplot, and first instance
+				postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
+			else:#Multiplot, and after first instance
+				postplot = fig_ax[0]
+				postplot.samples = samples ; postplot.Rhats   = Rhats
+				postplot.chains  = [postplot.samples[par] for par in postplot.parnames]
+				postplot.choices = self.plotting_parameters
+			counter,Npanel,line_index,legend_labels = fig_ax[1:5]
+			colour = f'C{counter}'
+			lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
+			if counter==0: postplot.lc = len(lines[:line_index])
+			y0 = len(self.parnames)+Npanel*0.15
+
+		Summary_Strs    = postplot.corner_plot(verbose=not blind,blind=blind,colour=colour,multiplot=False if not multiplot else [counter if legend_labels!=[''] else -1,Npanel])#Table Summary
+		if multiplot:#Plot multiplot lines
+			for ticker,line in enumerate(legend_labels):
+				pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),y0-0.35-0.15*(postplot.lc+ticker-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')
+
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
-		finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel),save,show,self.plotpath,savekey)
 
+		if counter+1==Npanel:finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[:line_index]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=y0)
+
+		if multiplot: postplot.lc += len(legend_labels)
 		#Return posterior summaries
-		if returner: return Summary_Strs
+		if returner:
+			if multiplot:
+				return Summary_Strs, postplot
+			else:
+				return Summary_Strs
+		else:
+			if multiplot:
+				return postplot
 
 
 
@@ -507,7 +540,7 @@ class multi_galaxy_siblings:
 			if True, blind sigmaRel plot axes and posterior summaries
 
 		fig_ax : None or list (optional; default=None)
-			if None, create new figure, else, fig_ax = [fig,ax,counter], where counter denotes how many times figure has been used
+			if None, create new figure, else, fig_ax = [fig,ax,counter, (optional kmax)], where counter denotes how many times figure has been used
 
 		End Product(s)
 		----------
