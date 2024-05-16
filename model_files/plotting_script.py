@@ -9,7 +9,7 @@ Contains:
 --------------------
 Functions:
 	kde(x_data, x_target, y_data=None, y_target=None, x_bounds=None, y_bounds=None, smoothing=1.0)
-	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None)
+	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None, lines=True)
 	get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel)
 
 POSTERIOR_PLOTTER class:
@@ -562,7 +562,7 @@ class PARAMETER:
 		y0 = len(ax)-0.85 ;
 		delta_y = 0.15 ; Summary_Str = ''
 		#For multiplot
-		x0 = 0.5; dy = 0.15 ; y0 = 0.05 ; ha = 'center'
+		x0 = 0.5; dy = 0.15-0.03*(len(ax)<4) ; y0 = 0.05 ; ha = 'center'
 		if not paperstyle: ax[row,row].set_title(r'$\hat{R}$('+self.parlabel.split(' (')[0]+f') = {self.Rhat:.3}')
 
 		#Plot KDE
@@ -662,7 +662,7 @@ class PARAMETER:
 		return Summary_Str
 
 
-def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None):
+def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None,lines=True):
 	"""
 	Finish Corner Plot
 
@@ -690,6 +690,9 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=No
 	y0 : None or float (default=None)
 		defines height of lines, if None, use len(ax)
 
+	lines : bool (optional; default=True)
+		if True, plot lines
+
 	End Product(s)
 	----------
 	plot that is saved and/or shown
@@ -699,8 +702,9 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=No
 	DX      = 0 + (len(ax)==1)*1.1
 	y0      = len(ax) if y0 is None else y0
 	pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,y0-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
-	for counter,line in enumerate(Lines):
-		pl.annotate(line, xy=(1+DX,y0-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')#weight='bold'
+	if lines:
+		for counter,line in enumerate(Lines):#og fontsize=15
+			pl.annotate(line, xy=(1+DX,y0-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')#weight='bold'
 	fig.subplots_adjust(top=0.9)
 	fig.subplots_adjust(wspace=0.075, hspace=0.075)
 	if save:
