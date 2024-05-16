@@ -64,7 +64,7 @@ err=1/0
 
 #ANALYSE
 multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True)
-multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],alpha_zhel=False,blind=True,save=True,show=False)
+#multigal.compute_analytic_multi_gal_sigmaRel_posterior(prior_upper_bounds=[1.0],alpha_zhel=False,blind=True,save=True,show=False)
 
 '''#Overlay analytic sigmaRel posteriors for different treatments of alpha_zhel
 fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
@@ -96,7 +96,22 @@ multigal.plot_parameters('mu',g_or_z = 'z',zword='zcmb_hats')
 multigal.plot_delta_HR()
 err=1/0
 #'''
-#multigal.n_warmup   = 2000 ; multigal.n_sampling = 8000
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior=True,overwrite=True,blind=True,zcosmo='zcmb',alpha_zhel=False)
-multigal.plot_posterior_samples(blind=True)
+
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior=True,overwrite=False,blind=True,zcosmo='zcmb',alpha_zhel=False)
+multigal.plot_posterior_samples(blind=True,show=False, save=True)
+
+'''#Multi-model overlay (mu, z, z w/ mu-zhelio)
+overwrite=False
+#multigal.n_warmup   = 2000 ; multigal.n_sampling = 10000 ; overwrite=True
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior=True,overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=False)
+postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[None,0,3,-1,[r'Modelled $\hat{z}_{\rm{CMB}}$ Distances']],show=False, save=False, quick=True)
+postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[postplot,0,3,-1,['']],show=False, save=False, quick=False)
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,alt_prior=True,overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=False)
+postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[postplot,1,3,None,[r'Modelled $z_{\rm{CMB}}$ Parameters']],show=False, save=False, quick=False)
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,alt_prior=True,overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=True)
+postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[postplot,2,3,-2,[r'As above w/ $\epsilon_{\mu} = \hat{\alpha} \epsilon_{z_{\rm{Helio}}}$ for 3 Galaxies']],show=False, save=True, quick=False)
+#'''
+
+
+
 #'''
