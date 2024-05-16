@@ -437,7 +437,11 @@ class multi_galaxy_siblings:
 			option to mask posterior results
 
 		fig_ax : None or list (optional; default=None)
-			if None, create new figure, else, fig_ax = [fig,ax,counter,:index_in_lines_to_include,Legend Label, (optional kmax)], where counter denotes how many times figure has been used
+			if None, create new figure, else, fig_ax = [postplot,counter,Npanel,line_index,legend_labels],
+			counter denotes how many times figure has been used
+			Npanel is how many sample files in total
+			line_index indicates (where applicable) how many descriptive lines to use in plot
+			legend_labels is list of lines describing individual model
 
 		End Product(s)
 		----------
@@ -540,7 +544,11 @@ class multi_galaxy_siblings:
 			if True, blind sigmaRel plot axes and posterior summaries
 
 		fig_ax : None or list (optional; default=None)
-			if None, create new figure, else, fig_ax = [fig,ax,counter, (optional kmax)], where counter denotes how many times figure has been used
+			if None, create new figure, else, fig_ax = [postplot,counter,Npanel,line_index,legend_labels],
+			counter denotes how many times figure has been used
+			Npanel is how many sample files in total
+			line_index indicates (where applicable) how many descriptive lines to use in plot
+			legend_labels is list of lines describing individual model
 
 		End Product(s)
 		----------
