@@ -9,7 +9,7 @@ Contains:
 --------------------
 Functions:
 	kde(x_data, x_target, y_data=None, y_target=None, x_bounds=None, y_bounds=None, smoothing=1.0)
-	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey)
+	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None)
 	get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel)
 
 POSTERIOR_PLOTTER class:
@@ -18,7 +18,7 @@ POSTERIOR_PLOTTER class:
 	Methods are:
 		update_lims(Nsig=3)
 		corner(fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15, blind=False)
-		corner_plot(verbose=True, blind=False)
+		corner_plot(verbose=True, blind=False, colour=None, multiplot=False)
 
 PARAMETER class:
 	inputs: chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None
@@ -28,7 +28,7 @@ PARAMETER class:
 		slice_reflection_KDE()
 		get_xgrid_KDE()
 		get_KDE_values(location=None,value=None, return_only_index=False)
-		plot_marginal_posterior(ax,colour='C0',alph=0.2,FS=14,verbose=True,blind=False)
+		plot_marginal_posterior(ax,colour='C0',alph=0.2,FS=14,verbose=True,blind=False, multiplot=False)
 --------------------
 Mostly Copied from Bird-Snack (https://github.com/sam-m-ward/birdsnack)
 Written by Sam M. Ward: smw92@cam.ac.uk
@@ -209,7 +209,7 @@ class POSTERIOR_PLOTTER:
 		self.update_lims()
 
 
-	def corner(self, fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15, blind=False):
+	def corner(self, fig_ax, Ngrid=10, colour="C0", warn_tolerance=0.05, FS=15, blind=False):
 		"""
 		Corner Method
 
@@ -239,6 +239,7 @@ class POSTERIOR_PLOTTER:
 		----------
 		fig,ax
 		"""
+		if colour is None: colour="C0"
 		chains    = self.chains
 		names     = self.parlabels
 		lims      = self.lims
@@ -265,10 +266,8 @@ class POSTERIOR_PLOTTER:
 					print ('Corner 2D KDE on row,col indices',row,col)
 					pxrange = np.linspace(lims[col][0] - (bounds[col][0] is not None)*(lims[col][1]-lims[col][0]), lims[col][1] + (bounds[col][1] is not None)*(lims[col][1]-lims[col][0]), Ngrid*int(1 + (bounds[col][0] is not None) + (bounds[col][1] is not None)))
 					pxgrid, pygrid = np.meshgrid(pxrange, pyrange)
-					try:
-						cons = ax[row,col].contour(pxgrid, pygrid, np.reshape(kde(chains[col], pxgrid.flatten(), chains[row], pygrid.flatten(), x_bounds=bounds[col], y_bounds=bounds[row], smoothing=smoothing), pxgrid.shape), levels=25, colors=colour, alpha=0.1)
-					except Exception as e:
-						print (e)
+					try:					cons = ax[row,col].contour(pxgrid, pygrid, np.reshape(kde(chains[col], pxgrid.flatten(), chains[row], pygrid.flatten(), x_bounds=bounds[col], y_bounds=bounds[row], smoothing=smoothing), pxgrid.shape), levels=25, colors=colour, alpha=0)#alpha=0.1)
+					except Exception as e:	print (e)
 					fracs = []
 					for c, con in enumerate(cons.collections):
 						paths = con.get_paths()
@@ -316,7 +315,7 @@ class POSTERIOR_PLOTTER:
 		self.fig = fig
 		self.ax  = ax
 
-	def corner_plot(self,verbose=True,blind=False):
+	def corner_plot(self,verbose=True,blind=False, colour=None, multiplot=False):
 		"""
 		Plot posterior samples
 
@@ -330,6 +329,12 @@ class POSTERIOR_PLOTTER:
 		blind : bool (optional; default=False)
 			option to mask posterior results
 
+		colour : None or str (optional; default=None)
+			if None, use default value, otherwise, use input str
+
+		multiplot : bool or list (optional; default=False)
+			if not False, input should be list e.g. [0,3] meaning the first of 3 panels
+
 		End Product(s)
 		----------
 		Summary_Strs: dict
@@ -341,8 +346,11 @@ class POSTERIOR_PLOTTER:
 		pardict = self.pardict
 
 		#Create figure
-		sfigx,sfigy = 3.1*len(pardict),2.7*len(pardict)
-		fig,ax = pl.subplots(len(pardict),len(pardict),figsize=(sfigx,sfigy),sharex='col',sharey=False)
+		if 'fig' not in self.__dict__.keys() and 'ax' not in self.__dict__.keys():
+			sfigx,sfigy = 3.1*len(pardict),2.7*len(pardict)
+			fig,ax = pl.subplots(len(pardict),len(pardict),figsize=(sfigx,sfigy),sharex='col',sharey=False)
+		else:
+			fig,ax = self.fig,self.ax
 		if len(pardict)==1:	ax = np.array([[ax]])
 
 		if verbose: print ("###"*5)
@@ -351,10 +359,10 @@ class POSTERIOR_PLOTTER:
 			parameter = PARAMETER(self.chains[row],parname,self.pardict[parname],self.lims[row],self.bounds[row],self.Rhats[parname],row,self.choices,self.smoothing)
 			parameter.get_xgrid_KDE()
 			#Plot 1D Marginal KDEs
-			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax,verbose=verbose,blind=blind)
+			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax,verbose=verbose,blind=blind,colour=colour,multiplot=multiplot)
 			if verbose: print ("###"*5)
 		#Plot 2D marginals
-		self.corner([fig,ax],blind=blind)
+		self.corner([fig,ax],blind=blind,colour=colour)
 		if verbose: print ("Corner samples/contours plotted successfully")
 		return Summary_Strs
 
@@ -508,7 +516,7 @@ class PARAMETER:
 		else:
 			return grid_index, xgrid_loc, KDE_height
 
-	def plot_marginal_posterior(self,ax,colour='C0',alph=0.2,FS=14,verbose=True, blind=False):
+	def plot_marginal_posterior(self,ax,colour='C0',alph=0.2,FS=14,verbose=True, blind=False, multiplot=False):
 		"""
 		Plot Marginal Posterior
 
@@ -534,12 +542,15 @@ class PARAMETER:
 		blind : bool (optional; default=False)
 			option to mask posterior results
 
+		multiplot : bool or list (optional; default=False)
+			if not False, input should be list e.g. [0,3] meaning the first of 3 panels
+
 		Returns
 		----------
 		Summary_Str : str
 		   Posterior summary for table
 		"""
-
+		if colour is None: colour="C0"
 		paperstyle = self.choices['paperstyle']
 		chain      = self.chain
 		row        = self.row
@@ -550,6 +561,8 @@ class PARAMETER:
 		#Initialisations
 		y0 = len(ax)-0.85 ;
 		delta_y = 0.15 ; Summary_Str = ''
+		#For multiplot
+		x0 = 0.5; dy = 0.15 ; y0 = 0.05 ; ha = 'center'
 		if not paperstyle: ax[row,row].set_title(r'$\hat{R}$('+self.parlabel.split(' (')[0]+f') = {self.Rhat:.3}')
 
 		#Plot KDE
@@ -592,7 +605,12 @@ class PARAMETER:
 					summary = ["{:.3f}".format(x) for x in [self.samp_median, self.dfchain.par.quantile(0.84)-self.samp_median,self.samp_median-self.dfchain.par.quantile(0.16)]]
 				if blind: summary = ['0.X','0.X','0.X']
 				Summary_Str = f"${summary[0]}^{str('{')}+{summary[1]}{str('}')}_{str('{')}-{summary[2]}{str('}')}$"
-				ax[row,row].set_title(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), fontsize=FS)
+
+				if not multiplot:	ax[row,row].set_title(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), fontsize=FS)
+				else:
+					counter,Npanels = multiplot[:]
+					if counter!=-1:#If it is equal -1 this is code for don't annotate
+						ax[row,row].annotate(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]),xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
 				#ax[row,row].set_title(parlabel + " = {:.2f} $\pm$ {:.2f}".format(self.samp_median, self.samp_std), fontsize=FS)
 				#summary = ["{:.2f}".format(x) for x in [self.samp_median, self.samp_std,self.dfchain.par.quantile(0.95),self.dfchain.par.quantile(0.05)]]
 				#Summary_Str = f"${summary[0]}\\pm {summary[1]}^{str('{')}\\,\\,{summary[2]}{str('}')}_{str('{')}\\,\\,{summary[3]}{str('}')}$"
@@ -627,9 +645,16 @@ class PARAMETER:
 
 			if paperstyle:
 				if blind:
-					ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} 0.X (0.X)", fontsize=FS)
+					summarystr = parlabel.split(' (')[0] + f" {lg} 0.X (0.X)"
 				else:
-					ax[row,row].set_title(parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})", fontsize=FS)
+					summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})"
+				if not multiplot:	ax[row,row].set_title(summarystr, fontsize=FS)
+				else:
+					counter,Npanels = multiplot[:]
+					if counter!=-1:#If it is equal -1 this is code for don't annotate
+						ax[row,row].annotate(summarystr,xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
+
+
 			Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
 			if verbose: print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
@@ -637,7 +662,7 @@ class PARAMETER:
 		return Summary_Str
 
 
-def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey):
+def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None):
 	"""
 	Finish Corner Plot
 
@@ -659,15 +684,23 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey):
 	savekey : str
 		plot filname
 
+	colour : str (default='C0')
+		colour for lines
+
+	y0 : None or float (default=None)
+		defines height of lines, if None, use len(ax)
+
 	End Product(s)
 	----------
 	plot that is saved and/or shown
 	"""
+	if colour is None: colour='C0'
 	delta_y = 0.15
 	DX      = 0 + (len(ax)==1)*1.1
-	pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,len(ax)-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
+	y0      = len(ax) if y0 is None else y0
+	pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,y0-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
 	for counter,line in enumerate(Lines):
-		pl.annotate(line, xy=(1+DX,len(ax)-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color='C0',ha='right')#weight='bold'
+		pl.annotate(line, xy=(1+DX,y0-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')#weight='bold'
 	fig.subplots_adjust(top=0.9)
 	fig.subplots_adjust(wspace=0.075, hspace=0.075)
 	if save:
