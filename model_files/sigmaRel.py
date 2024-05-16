@@ -470,6 +470,7 @@ class multi_galaxy_siblings:
 		#Get posterior data
 		df         = FIT['chains'] ; fitsummary = FIT['summary'] ; stan_data  = FIT['data'] ; modelloader = FIT['modelloader']
 		self.get_parlabels(modelloader.get_pars())
+		if fig_ax is not None: self.get_parlabels(['sigmaRel','sigmaCommon'])
 		Rhats      = {par:fitsummary.loc[par]['r_hat'] for par in self.dfparnames}
 		samples    = {par:np.asarray(df[par].values)   for par in self.dfparnames}
 		print ('Rhats:',Rhats)
@@ -491,18 +492,27 @@ class multi_galaxy_siblings:
 			counter,Npanel,line_index,legend_labels = fig_ax[1:5]
 			colour = f'C{counter}'
 			lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
-			if counter==0: postplot.lc = len(lines[:line_index])
-			y0 = len(self.parnames)+Npanel*0.15
+			if counter==0:
+				postplot.lc = len(lines[:line_index])
+			y0  = len(self.parnames)+(Npanel+1*(len(self.parnames)<4))*0.15
+			FS += 0 + -2*(len(self.parnames)<4)
 
 		Summary_Strs    = postplot.corner_plot(verbose=not blind,blind=blind,colour=colour,multiplot=False if not multiplot else [counter if legend_labels!=[''] else -1,Npanel])#Table Summary
 		if multiplot:#Plot multiplot lines
+			dy  = (0.15-0.02*(len(self.parnames)<4))
+			yy0 = y0-0.35+0.06*(len(self.parnames)<4)
 			for ticker,line in enumerate(legend_labels):
-				pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),y0-0.35-0.15*(postplot.lc+ticker-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')
+				pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(postplot.lc+ticker-1)),xycoords='axes fraction',
+							fontsize=FS-4,color=colour,ha='right')
+			if counter+1==Npanel:
+				Lines = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[:line_index]
+				for ticker,line in enumerate(Lines):
+					pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
+								fontsize=FS-4,color='black',ha='right')
 
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
-
-		if counter+1==Npanel:finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[:line_index]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=y0)
+		if counter+1==Npanel:finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[:line_index]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=y0,lines= not multiplot)
 
 		if multiplot: postplot.lc += len(legend_labels)
 		#Return posterior summaries
