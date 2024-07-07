@@ -6,7 +6,7 @@ Module contains class for simulating individual siblings distance estimates
 Contains:
 --------------------
 SiblingsDistanceSimulator class:
-	inputs: Ng=30, Sg = 2, sigma0=0.1, sigmaRel=0.05, mu_bounds = [25,35], sigma_fit_s=0.05, external_distances=False
+	inputs: Ng=30, Sg = 2, sigma0=0.1, sigmaRel=0.05, mu_bounds = [25,35], sigma_fit_s=0.05, external_distances=False, random=None
 --------------------
 
 Written by Sam M. Ward: smw92@cam.ac.uk
@@ -19,7 +19,7 @@ from astropy.cosmology import FlatLambdaCDM
 
 class SiblingsDistanceSimulator:
 
-	def __init__(self, Ng=30, Sg = 2, sigma0=0.1, sigmaRel=0.05, zcmb_bounds = [0.01,0.1], fiducial_cosmology={"H0":73.24, "Om0":0.28}, sigma_fit_s=0.05, external_distances=False, zcmberr=1e-6, sigmapec=250):
+	def __init__(self, Ng=30, Sg = 2, sigma0=0.1, sigmaRel=0.05, zcmb_bounds = [0.01,0.1], fiducial_cosmology={"H0":73.24, "Om0":0.28}, sigma_fit_s=0.05, external_distances=False, zcmberr=1e-6, sigmapec=250, random=None):
 		"""
 		Initialisation
 
@@ -55,6 +55,9 @@ class SiblingsDistanceSimulator:
 		sigmapec : float (optionl; default=250)
 			in km/s, the peculiar velocity dispersion
 
+		random : None or int (optional; default=None)
+			sets numpy random seed, if None use 42
+
 		End Product(s)
 		----------
 		self.dfmus : pandas df
@@ -62,8 +65,10 @@ class SiblingsDistanceSimulator:
 		"""
 		self.__dict__.update(locals())
 		self.sigmaCommon = np.sqrt(np.square(self.sigma0)-np.square(self.sigmaRel))
+		self.rho         = np.square(self.sigmaCommon)/np.square(self.sigma0)
 		self.cosmo       = FlatLambdaCDM(**fiducial_cosmology) ; c_light = 299792458/1e3
-
+		if random is None: np.random.seed(42)
+		else: np.random.seed(random)
 		#Ensure Input Data Types are Correct
 		assert(type(self.Ng) is int)
 		assert(type(self.sigma0) in [float,int] and self.sigma0>0)
