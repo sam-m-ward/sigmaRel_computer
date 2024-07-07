@@ -119,7 +119,7 @@ for x in Summary_Strs:
 err=1/0
 #'''
 
-'''#cosmodep overlays full and cosmo-subsample
+#'''#cosmodep overlays full and cosmo-subsample
 overwrite=False
 multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,overwrite=overwrite,zcosmo='zcmb')
 postplot = multigal.plot_posterior_samples_1D(FS=20,pars=['rho','rel_rat2','com_rat2'],fig_ax=[None,0,2,[1,None],['Full Sample','[12 Galaxies]']],show=False, save=False,lines=True)
@@ -166,7 +166,7 @@ err=1/0
 #'''
 
 
-#'''#Test sens to hyperpriors
+'''#Test sens to hyperpriors
 zcosmo = 'zcmb'
 overwrite=False
 
