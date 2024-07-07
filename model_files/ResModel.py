@@ -74,7 +74,7 @@ class ResModelLoader:
 
 		#Input Posterior Parameters
 		self.master_parnames  = ['mu','AV','theta','RV','etaAV']
-		self.master_parlabels = ['$\\mu$ (mag)','$A_V$ (mag)','$\\theta$','$\\R_V$','$\\eta_{A_V}$']
+		self.master_parlabels = ['$\\Delta \\mu$ (mag)','$\\Delta A_V$ (mag)','$\\Delta \\theta$','$\\Delta \\R_V$','$\\Delta \\eta_{A_V}$']
 		self.master_bounds    = [[None,None],[0,None],[None,None],[None,None],[None,None]]
 
 		#Posterior Configuration
