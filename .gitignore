@@ -7,4 +7,8 @@ model_files/stan_files/linear_reg/current_model*
 .ipynb_checkpoints/
 bin/
 data/Store/
-model_files/stan_files/MultiGalFiles/altpriors/
+model_files/stan_files/MultiGalFiles/altpriors/old/
+model_files/stan_files/MultiGalFiles/original_default_prior/
+model_files/stan_files/LKJ/generator
+model_files/stan_files/LKJ/generator.hpp
+
