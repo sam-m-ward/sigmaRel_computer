@@ -857,7 +857,7 @@ class multi_galaxy_siblings:
 		for g,gal in enumerate(self.dfmus['Galaxy'].unique()):
 			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal].copy()
 			if alpha_zhel: dfgal = zhel_modify(dfgal)														#Use dummy value for sigma0
-			sibgal = siblings_galaxy(dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,gal,sigma0=0.1,prior_upper_bounds=self.prior_upper_bounds)
+			sibgal = siblings_galaxy(dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,gal,sigma0=0.1,prior_upper_bounds=self.prior_upper_bounds,rootpath=self.rootpath)
 			sibgal.get_sigmaRel_posteriors()
 			for p in self.prior_upper_bounds:
 				total_posteriors[p] *= sibgal.posteriors[p]*p #Multiply likelihoods, so divide out prior for each galaxy
