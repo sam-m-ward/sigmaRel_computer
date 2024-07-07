@@ -795,7 +795,13 @@ class PARAMETER:
 						print ('p_rhohalf:',int(round(100*sum([1 for s in self.dfchain.par if s<0.5])/len(self.dfchain.par),0)))
 					print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
-		if not multiplot: ax[xrow,row].set_ylim([0,None])
+		if not multiplot:
+			ax[xrow,row].set_ylim([0,None])
+		else:
+			if multiplot[1]-1==multiplot[0]:#if last panel
+				y = ax[xrow,row].get_ylim()
+				ax[xrow,row].set_ylim([0,y[1]])
+
 		return Summary_Str
 
 
