@@ -29,8 +29,7 @@ for rs in [9]:
 
         #Multi-model overlay
         zcosmo = 'zcmb'
-        #sigma0 = 0.1 ; lind = 1 ; Np = 4#For when sigma0 is fixed, don't plot sigR, sigC model
-        sigma0 = 'free' ; lind = 0; Np = 4
+        sigma0 = 'free' ; Np = 4
         overwrite=True
         overwrite=False
         savekey   = f'multigalsims_{samplename}_Modelsigma0{sigma0}'
@@ -38,17 +37,17 @@ for rs in [9]:
         counter = 0 ; print (savekey);
         recovery_str= tick_cross[RHO in []]
         multigal.sigmaRel_sampler(sigma0=sigma0,sigmapec=250,use_external_distances=True,zcosmo=zcosmo,overwrite=overwrite)
-        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[None,    counter,Np,[0,-2+lind],''],returner=True); Summary_Strs.append(beta_prior_lines[-1]+' & \multirow{'+str(Np)+'}{*}{'+r'$\rho=%s$'%RHO+'} & '+' & '.join(list(summary.values())) + f'& {recovery_str} \\\\ ')
+        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[None,    counter,Np,[0,-2],''],returner=True); Summary_Strs.append(beta_prior_lines[-1]+' & \multirow{'+str(Np)+'}{*}{'+r'$\rho=%s$'%RHO+'} & '+' & '.join(list(summary.values())) + f'& {recovery_str} \\\\ ')
         counter += 1; print (savekey)
 
         recovery_str=tick_cross[RHO in [0]]
         multigal.sigmaRel_sampler(alt_prior='A',sigma0=sigma0,sigmapec=250,use_external_distances=True,zcosmo=zcosmo,overwrite=overwrite)
-        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,counter,Np,[0,0],'',lind],returner=True); Summary_Strs.append(priorA_lines[-1]+' & & '+' & '.join(list(summary.values())) +f'& {recovery_str} \\\\ ')
+        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,counter,Np,[0,0],''],returner=True); Summary_Strs.append(priorA_lines[-1]+' & & '+' & '.join(list(summary.values())) +f'& {recovery_str} \\\\ ')
         counter += 1; print (savekey)
 
         recovery_str=tick_cross[RHO in [1]]
         multigal.sigmaRel_sampler(alt_prior='B',sigma0=sigma0,sigmapec=250,use_external_distances=True,zcosmo=zcosmo,overwrite=overwrite)
-        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,counter,Np,[0,0],'',lind],returner=True); Summary_Strs.append(priorB_lines[-1]+' & & '+' & '.join(list(summary.values())) +f'& {recovery_str} \\\\ ')
+        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,counter,Np,[0,0],''],returner=True); Summary_Strs.append(priorB_lines[-1]+' & & '+' & '.join(list(summary.values())) +f'& {recovery_str} \\\\ ')
         counter += 1; print (savekey)
 
         recovery_str=tick_cross[RHO in [0,1]]
@@ -81,7 +80,7 @@ for rs in [9]:
             postplot.ax[0,cntr].plot([true_value,true_value],[0,ymax],linewidth=5,color='black',zorder=100,linestyle='--')
             postplot.ax[0,cntr].set_ylim([0,ymax])
         #'''############################################################################################################################################
-        summary, postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,counter,Np,[0,0],'',lind],savekey=savekey,returner=True); Summary_Strs.append(priorC_lines[-1]+' & & '+' & '.join(list(summary.values())) + f'& {recovery_str} \\\\ ')
+        summary, postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,counter,Np,[0,0],''],savekey=savekey,returner=True); Summary_Strs.append(priorC_lines[-1]+' & & '+' & '.join(list(summary.values())) + f'& {recovery_str} \\\\ ')
         Summary_Strs.append('\\midrule')
 for x in Summary_Strs:
     print (x)
