@@ -8,16 +8,22 @@ siblings_galaxy class same as multi_galaxy class but just for a single siblings 
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}
+	inputs: dfmus,samplename='full',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}
 
 	Methods are:
 		create_paths()
 		infer_pars()
+		get_redshift_distances()
+		get_cosmo_subsample(limits={'thetas':[-1.5,2.0],'AVs':[0.0,1.0]})
 		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
+		trim_sample(key='cosmo',bool_column=None)
+		restore_sample()
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
 		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False,zcosmo='zHD')
-		plot_posterior_samples(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None)
+		add_transformed_params(df,fitsummary)
+		plot_posterior_samples(   FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
+		plot_posterior_samples_1D(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
 		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
@@ -104,6 +110,30 @@ class multi_galaxy_siblings:
 			assert(zcol.split('_hats')[0]+'_errs' in self.dfmus.columns)#Check errors in either/both of zHD and zcmb are there
 			self.dfmus[f'muext_{zcol}'] = self.dfmus[['zhelio_hats',zcol]].apply(lambda z: self.cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
 
+	def get_cosmo_subsample(self,limits={'thetas':[-1.5,2.0],'AVs':[0.0,1.0]}):
+		"""
+		Get Cosmology Subsample
+
+		Take siblings sample and apply cuts on e.g. theta, AV
+
+		Parameters
+		----------
+		limits : dict (optional; default={'theta':[-1.5,2.0],'AV':[0.0,1.0]})
+
+		End Product(s)
+		----------
+		dfmus['cosmo_sample'] bool column
+		"""
+		bools = {}
+		for g in self.dfmus.Galaxy:
+			dfg = self.dfmus[self.dfmus.Galaxy==g]
+			bools[g] = True
+			for par in limits:
+				if par in dfg.columns and dfg[(dfg[par]<limits[par][0])|(dfg[par]>limits[par][1])].shape[0]>0:
+					bools[g] = False
+					break
+		self.dfmus['cosmo_sample'] = self.dfmus['Galaxy'].map(bools)
+
 	def print_table(self, PARS=['mu','AV','theta','RV'],verbose=False,returner=False):
 		"""
 		Print Tables
@@ -125,7 +155,9 @@ class multi_galaxy_siblings:
 		----------
 		Prints out string
 		"""
-		PARS       = [p for p in ['mu','AV','theta','RV'] if p in PARS]
+		all_PARS   = copy.deepcopy(PARS)
+		pPARS      = ['mu','AV','theta','RV']
+		PARS       = [p for p in pPARS if p in PARS]
 		pars       = [p for p in PARS if f'{p}s' in self.parcols]
 		samp_cols  = [f'{p}_samps' for p in pars]
 		assert(samp_cols!=[])
@@ -137,15 +169,32 @@ class multi_galaxy_siblings:
 
 		plotting_parameters = {'FS':self.FS,'paperstyle':False,'quick':True,'save':False,'show':False}
 		lines = [] ; old_g = self.dfmus['Galaxy'].iloc[0]
-		for sn in self.dfmus.index:
+		for isn,sn in enumerate(self.dfmus.index):
+			NSN_g = str(self.dfmus[self.dfmus.Galaxy==self.dfmus.Galaxy.loc[sn]].shape[0])
 			if self.dfmus['Galaxy'].loc[sn]!=old_g:
 				lines.append('\midrule')
 				old_g = self.dfmus['Galaxy'].loc[sn]
+				new_g = True
+			else:
+				new_g = False if isn!=0 else True
 			samples = {par:self.dfmus[samp_col].loc[sn] for par,samp_col in zip(pars,samp_cols)}
 			Rhats   = {par:self.dfmus[f'{par}_Rhats'].loc[sn] for par in pars}
 			postplot = POSTERIOR_PLOTTER(samples, pars, parlabels, bounds, Rhats, plotting_parameters)
 			Summary_Strs = postplot.corner_plot(verbose=verbose)#Table Summary
-			line = self.dfmus['SN'].loc[sn] + ' & ' + self.dfmus['Galaxy'].loc[sn].astype(str) +' & ' + ' & '.join(list(Summary_Strs.values())) + ' \\\\ '
+			#Create Line
+			line = self.dfmus['SN'].loc[sn].replace('_','\_') + ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,self.dfmus['Galaxy'].loc[sn].astype(str)) if new_g else '')
+			for par in all_PARS:
+				if par in pars:
+					line += ' & ' + Summary_Strs[par]
+				elif par not in pars and par not in pPARS:
+					if par in ['zcmb_hats','zHD_hats']:
+						line += ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,str(round(self.dfmus[par].loc[sn],6))) if new_g else '')#int(-np.log10(self.dfmus['zhelio_errs'].loc[sn]))))
+					elif par in ['cosmo_sample']:
+						mark  = {True:"\\cmark",False:"\\xmark"}[self.dfmus[par].loc[sn]]
+						line += ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,{True:"\\cmark",False:"\\xmark"}[self.dfmus[par].loc[sn]]) if new_g else '')
+					else:
+						line += ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,self.dfmus[par].astype(str).loc[sn]) if new_g else '')
+			line +=  ' \\\\ '
 			lines.append(line)
 		if returner:
 			return lines
@@ -154,7 +203,7 @@ class multi_galaxy_siblings:
 
 
 
-	def __init__(self,dfmus,samplename='multigal',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}):
+	def __init__(self,dfmus,samplename='full',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}):
 		"""
 		Initialisation
 
@@ -163,7 +212,7 @@ class multi_galaxy_siblings:
 		dfmus : pandas df
 			dataframe of individual siblings distance estimates with columns Galaxy, SN, mus, mu_errs
 
-		samplename : str (optional; default='multigal')
+		samplename : str (optional; default='full')
 			name of multi-galaxy sample of siblings
 
 		sigma0 : float (optional; default=0.1)
@@ -196,9 +245,20 @@ class multi_galaxy_siblings:
 		self.dfmus      = dfmus
 		self.samplename = samplename
 		self.dfmus.sort_values(['Galaxy','SN'],ascending=True,inplace=True)
+
+		try:#Reorder and re-label galaxies. Order by redshift, and within this, by zhelio error
+			ordered_galaxies = self.dfmus.groupby('Galaxy')[['zhelio_hats','zhelio_errs']].agg('mean').sort_values(by=['zhelio_hats','zhelio_errs']).index
+			new_galaxies     = dict(zip(ordered_galaxies.values,np.arange(1,self.dfmus.Galaxy.max()+1,dtype=int)))
+			self.dfmus       = self.dfmus.set_index('Galaxy').loc[ordered_galaxies].reset_index()
+			self.dfmus['Galaxy'] = self.dfmus['Galaxy'].map(new_galaxies)
+		except:
+			pass
+
 		self.infer_pars()
 		self.fiducial_cosmology = fiducial_cosmology
-		self.get_redshift_distances()
+		self.get_redshift_distances()#Create ['muext_zHD_hats','muext_zcmb_hats'] columns
+		self.get_cosmo_subsample()#Create cosmo_sample column
+		self.og_dfmus = copy.deepcopy(self.dfmus) ; self.og_samplename = copy.deepcopy(self.samplename)
 
 		#Input Posterior Parameters
 		self.master_parnames  = ['mu','AV','theta','RV']
@@ -231,6 +291,49 @@ class multi_galaxy_siblings:
 		self.verbose = verbose
 		if self.verbose:
 			print (self.dfmus[self.parcols])
+
+	def trim_sample(self,key='cosmo',bool_column=None):
+		"""
+		Trim Sample
+
+		Simple method to take dfmus and cut based on some bool column
+		Default is to cut to the cosmology sub-sample, and the bool column is pre-computed already
+
+		Parameters
+		----------
+		key: str (optional; default='cosmo')
+			sample key used for labelling/saving/loading plots/chains
+
+		bool_column: pd.Series (optional; default=None)
+			used to filter dfmus[bool_column]
+
+		End Product(s)
+		----------
+		assigns trimmed self.dfmus, and new self.samplename
+		"""
+		if key=='cosmo':
+			try:
+				assert(self.samplename==self.og_samplename)
+				self.dfmus = self.dfmus[self.dfmus.cosmo_sample]
+				self.samplename = 'cosmo'
+			except:
+				raise Exception('If trying to trim to cosmology sub-sample, ensure original sample is loaded first by running .restore_sample()')
+		else:
+			self.dfmus = self.dfmus[bool_column]
+			self.samplename = key
+
+	def restore_sample(self):
+		"""
+		Restore Sample
+
+		Restores dfmus to full sample (after e.g. cutting to the cosmology sub-sample)
+		"""
+		if self.samplename!=self.og_samplename:
+			self.dfmus      = copy.deepcopy(self.og_dfmus)
+			self.samplename = copy.deepcopy(self.og_samplename)
+		else:
+			pd.testing.assert_frame_equal(self.dfmus,self.og_dfmus)#Assert they are the same
+			print ('Full sample already in use')
 
 	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances']):
 		"""
@@ -269,10 +372,10 @@ class multi_galaxy_siblings:
 		self.parnames, self.dfparnames, self.parlabels, self.bounds
 		"""
 		#Initialisation
-		parnames   = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon']
-		dfparnames = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon']
-		parlabels  = ['$\\sigma_0$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)','$\\rho$','$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_{\\rm{Common}}$ (mag)']
-		bounds     = [[0,1],[0,self.c_light],[0,1],[0,None],[0,None]]
+		parnames   = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon','rel_rat','com_rat','rel_rat2','com_rat2']
+		dfparnames = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon','rel_rat','com_rat','rel_rat2','com_rat2']
+		parlabels  = ['$\\sigma_0$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)','$\\rho$','$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_{\\rm{Common}}$ (mag)','$\\sigma_{\\rm{Rel}}/\\sigma_0$','$\\sigma_{\\rm{Common}}/\\sigma_0$','$\\sigma^2_{\\rm{Rel}}/\\sigma^2_0$','$\\sigma^2_{\\rm{Common}}/\\sigma^2_0$']
+		bounds     = [[0,1],[0,self.c_light],[0,1],[0,None],[0,None],[0,1],[0,1],[0,1],[0,1]]
 
 		#Filter on pars
 		PARS  = pd.DataFrame(data=dict(zip(['dfparnames','parlabels','bounds'],[dfparnames,parlabels,bounds])),index=parnames)
@@ -344,7 +447,7 @@ class multi_galaxy_siblings:
 		----------
 		self.FIT, posterior samples saved in self.productpath
 		"""
-		if alt_prior and sigma0!='free':
+		if alt_prior==True and sigma0!='free':
 			raise Exception('Cannot use alternative prior and while not freeing sigma0')
 		if alpha_zhel and not zmarg:
 			raise Exception('Cannot activate alpha_zhel mode with mu-pipeline; please set zmarg=True')
@@ -407,7 +510,37 @@ class multi_galaxy_siblings:
 		#Print distance summaries
 		self.FIT  = FIT
 
-	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False, fig_ax=None):
+	def add_transformed_params(self,df,fitsummary):
+		"""
+		Add Transformed Parameters
+
+		Simple method take compute new transformed parameters from original parameter samples
+
+		Parameters
+		----------
+		df: pandas df
+			contains posterior samples
+
+		fitsummary: pandas df
+			from arviz, contains summaries including Rhats
+
+		Returns
+		----------
+		df, fitsummary with updated values
+		"""
+		#Added Parameters
+		added_pars = ['rel_rat','com_rat','rel_rat2','com_rat2']
+		df['rel_rat'] = df['sigmaRel']/df['sigma0']
+		df['com_rat'] = df['sigmaCommon']/df['sigma0']
+		df['rel_rat2'] = df['sigmaRel'].pow(2)/df['sigma0'].pow(2)
+		df['com_rat2'] = df['sigmaCommon'].pow(2)/df['sigma0'].pow(2)
+		#Appender
+		added_fitsummary = az.summary({x:np.array_split(df[x].values,self.n_chains) for x in added_pars})
+		for x in added_pars:
+			fitsummary.loc[x,'r_hat'] = added_fitsummary.loc[x]['r_hat']
+		return df, fitsummary
+
+	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False, fig_ax=None, **kwargs):
 		"""
 		Plot Posterior Samples
 
@@ -469,8 +602,15 @@ class multi_galaxy_siblings:
 
 		#Get posterior data
 		df         = FIT['chains'] ; fitsummary = FIT['summary'] ; stan_data  = FIT['data'] ; modelloader = FIT['modelloader']
-		self.get_parlabels(modelloader.get_pars())
-		if fig_ax is not None: self.get_parlabels(['sigmaRel','sigmaCommon'])
+		df, fitsummary = self.add_transformed_params(df, fitsummary)
+		for parq in [[x.split('filt_')[1],kwargs[x]] for x in kwargs.keys() if  'filt_' in x]:
+			par,q = parq[:]
+			df = df[(df[par]>=df[par].quantile(q[0])) & (df[par]<=df[par].quantile(q[1]))]
+
+		if 'pars' in kwargs.keys():
+			self.get_parlabels(kwargs['pars'])
+		else:
+			self.get_parlabels(modelloader.get_pars())
 		Rhats      = {par:fitsummary.loc[par]['r_hat'] for par in self.dfparnames}
 		samples    = {par:np.asarray(df[par].values)   for par in self.dfparnames}
 		print ('Rhats:',Rhats)
@@ -479,7 +619,7 @@ class multi_galaxy_siblings:
 		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
 		if fig_ax is None:#Single Plot
 			postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
-			colour = None ; counter = 0; Npanel = 1; line_index = None ; multiplot = False ; y0 = None
+			colour = None if 'colour' not in kwargs.keys() else kwargs['colour'] ; counter = 0; Npanel = 1; line_index = [None,None] ; multiplot = False ; postplot.y0 = None
 		else:
 			multiplot = True
 			if fig_ax[0] is None:#Multiplot, and first instance
@@ -490,31 +630,156 @@ class multi_galaxy_siblings:
 				postplot.chains  = [postplot.samples[par] for par in postplot.parnames]
 				postplot.choices = self.plotting_parameters
 			counter,Npanel,line_index,legend_labels = fig_ax[1:5]
-			colour = f'C{counter}'
-			lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
-			if counter==0:
-				postplot.lc = len(lines[:line_index])
-			y0  = len(self.parnames)+(Npanel+1*(len(self.parnames)<4))*0.15
+			colour = f'C{counter + (0 if len(fig_ax)==5 else fig_ax[5])}'
+			postplot.lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
+			if counter==0 and fig_ax[0] is None:
+				postplot.lc = len(postplot.lines[line_index[0]:line_index[1]])
+			postplot.y0  = len(self.parnames)+(Npanel+1*(len(self.parnames)<4))*0.15
 			FS += 0 + -2*(len(self.parnames)<4)
 
 		Summary_Strs    = postplot.corner_plot(verbose=not blind,blind=blind,colour=colour,multiplot=False if not multiplot else [counter if legend_labels!=[''] else -1,Npanel])#Table Summary
 		if multiplot:#Plot multiplot lines
 			dy  = (0.15-0.02*(len(self.parnames)<4))
-			yy0 = y0-0.35+0.06*(len(self.parnames)<4)
+			yy0 = postplot.y0-0.35+0.06*(len(self.parnames)<4)
 			for ticker,line in enumerate(legend_labels):
 				pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(postplot.lc+ticker-1)),xycoords='axes fraction',
 							fontsize=FS-4,color=colour,ha='right')
 			if counter+1==Npanel:
-				Lines = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[:line_index]
-				for ticker,line in enumerate(Lines):
+				for ticker,line in enumerate(postplot.lines[line_index[0]:line_index[1]]):
 					pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
 								fontsize=FS-4,color='black',ha='right')
 
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
-		if counter+1==Npanel:finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[:line_index]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=y0,lines= not multiplot)
+		if counter+1==Npanel:
+			finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[line_index[0]:line_index[1]]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,colour if not multiplot else 'black',y0=postplot.y0,lines= not multiplot)
 
-		if multiplot: postplot.lc += len(legend_labels)
+		if multiplot and legend_labels!=['']: postplot.lc += len(legend_labels)
+		#Return posterior summaries
+		if returner:
+			if multiplot:
+				return Summary_Strs, postplot
+			else:
+				return Summary_Strs
+		else:
+			if multiplot:
+				return postplot
+
+
+	def plot_posterior_samples_1D(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False, fig_ax=None, **kwargs):
+		"""
+		Plot Posterior Samples
+
+		Method to take posterior samples and plot them up
+
+		Parameters
+		----------
+		FS : float (optional; default=18)
+			fontsize for plotting
+
+		paperstyle : bool (optional; default=True)
+			if False, plot up Rhat values
+
+		quick : bool (optional; default=True)
+			if True, plot samples in 2D panels, if False, plot KDEs in 2D panel
+
+		show : bool (optional; default=False)
+			bool to show plots or not
+
+		save : bool (optional; default=True)
+			bool to save plots or not
+
+		returner : bool (optional; default=False)
+			if True, return posterior summaries for use in a Table
+
+		blind : bool (optional; default=False)
+			option to mask posterior results
+
+		fig_ax : None or list (optional; default=None)
+			if None, create new figure, else, fig_ax = [postplot,counter,Npanel,line_index,legend_labels],
+			counter denotes how many times figure has been used
+			Npanel is how many sample files in total
+			line_index indicates (where applicable) how many descriptive lines to use in plot
+			legend_labels is list of lines describing individual model
+
+		End Product(s)
+		----------
+		Plot
+		"""
+
+		#Get posterior samples
+		if 'FIT' in self.__dict__.keys():
+			FIT = self.FIT
+		else:
+			savekey  = self.samplename+self.modelkey
+			filename = self.productpath+f"FIT{savekey}.pkl"
+			with open(filename,'rb') as f:
+				FIT = pickle.load(f)
+
+		#Get posterior data
+		df         = FIT['chains'] ; fitsummary = FIT['summary'] ; stan_data  = FIT['data'] ; modelloader = FIT['modelloader']
+		df, fitsummary = self.add_transformed_params(df, fitsummary)
+		if fig_ax is not None and 'pars' in kwargs.keys():
+			self.get_parlabels(kwargs['pars'])
+		else:
+			self.get_parlabels(modelloader.get_pars())
+		Rhats      = {par:fitsummary.loc[par]['r_hat'] for par in self.dfparnames}
+		samples    = {par:np.asarray(df[par].values)   for par in self.dfparnames}
+		print ('Rhats:',Rhats)
+
+		#Corner Plot
+		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
+		if fig_ax is None:#Single Plot
+			postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
+			colour = None ; counter = 0; Npanel = 1; line_index = [None,None] ; multiplot = False ; postplot.y0 = None
+		else:
+			multiplot = True
+			if fig_ax[0] is None:#Multiplot, and first instance
+				postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
+			else:#Multiplot, and after first instance
+				postplot = fig_ax[0]
+				postplot.samples = samples ; postplot.Rhats   = Rhats
+				postplot.chains  = [postplot.samples[par] for par in postplot.parnames]
+				postplot.choices = self.plotting_parameters
+			counter,Npanel,line_index,legend_labels = fig_ax[1:5]
+			colour = f'C{counter + (0 if len(fig_ax)==5 else fig_ax[5])}'
+			postplot.lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
+			if counter==0 and fig_ax[0] is None:
+				postplot.lc = len(postplot.lines[line_index[0]:line_index[1]])
+			postplot.y0  = 1.3#len(self.parnames)+(Npanel+1*(len(self.parnames)<4))*0.15
+			FS += 0 + -2*(len(self.parnames)<4)
+
+		Summary_Strs    = postplot.plot_1Drow(verbose=not blind,blind=blind,colour=colour,multiplot=False if not multiplot else [counter if legend_labels!=[''] else -1,Npanel])#Table Summary
+		if multiplot and 'lines' in kwargs:
+			x0  = 1.15
+			if kwargs['lines']:
+				dy  = (0.15-0.02*(len(self.parnames)<4))
+				yy0 = postplot.y0-0.35+0.06*(len(self.parnames)<4)
+				for ticker,line in enumerate(legend_labels):
+					pl.annotate(line, xy=(x0+1.1*(len(postplot.ax)==1),yy0-dy*(postplot.lc+ticker-1)),xycoords='axes fraction',
+								fontsize=FS-4,color=colour,ha='right')
+				if counter+1==Npanel:
+					pl.annotate(r"sigmaRel_Computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='black',weight='bold',ha='right',fontname='Courier New')
+					for ticker,line in enumerate(postplot.lines[line_index[0]:line_index[1]]):
+						pl.annotate(line, xy=(x0+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
+									fontsize=FS-4,color='black',ha='right')
+			elif not kwargs['lines']:
+				pl.annotate(r"sigmaRel_Computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='white',weight='bold',ha='right',fontname='Courier New')
+
+
+
+		if 'savekey' not in kwargs:
+			savekey = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
+		else:
+			savekey = kwargs['savekey']
+		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
+		if counter+1==Npanel:
+			if multiplot:
+				for col in range(len(self.parnames)):
+					postplot.ax[0,col].set_ylim([0,postplot.ax[0,col].get_ylim()[1]])
+			finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[line_index[0]:line_index[1]]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=postplot.y0,lines= not multiplot,oneD=True)
+
+		if multiplot and legend_labels!=['']: postplot.lc += len(legend_labels)
 		#Return posterior summaries
 		if returner:
 			if multiplot:
@@ -605,6 +870,13 @@ class multi_galaxy_siblings:
 			for p in self.prior_upper_bounds:
 				sibgal.posteriors[p]  = total_posteriors[p]
 				sibgal.sigRs_store[p] = sigRs_store[p]
+
+				sibgal.posterior = total_posteriors[p]
+				print ('50%-16%:',sibgal.get_quantile(0.5,return_index=False)-sibgal.get_quantile(0.16,return_index=False))
+				print ('50%:',sibgal.get_quantile(0.5,return_index=False))
+				print ('84%-50%:',sibgal.get_quantile(0.84,return_index=False)-sibgal.get_quantile(0.5,return_index=False))
+				print ('95%:',sibgal.get_quantile(0.95,return_index=False))
+
 			sibgal.show     = show
 			sibgal.save     = save
 			sibgal.galname  = self.samplename
@@ -696,7 +968,7 @@ class multi_galaxy_siblings:
 			z_hats = self.dfmus.groupby('Galaxy',sort=False)[zword].agg('mean').values
 			for igal,gal in enumerate(Ng):
 				dfgal  = self.dfmus[self.dfmus['Galaxy']==gal].copy()
-				muext  = cosmo.distmod(z_hats[igal]).value
+				muext  = dfgal[f'muext_{zword}'].values[0]#cosmo.distmod(z_hats[igal]).value
 				for mu,ss in zip(dfgal['mus'].values,np.arange(dfgal.shape[0])):
 					HR_collection[zword][f'{igal}_{ss}'] = mu-muext
 
@@ -728,7 +1000,7 @@ class multi_galaxy_siblings:
 							show=False, save=True,
 							markersize=14,capsize=5,alpha=0.9,elw=3,mew=3, plot_full_errors=False,plot_sigma0=0.094,plot_sigmapec = 250,
 							text_index = 3, annotate_mode = 'legend',
-							args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}):
+							args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)},**kwargs):
 		"""
 		Plot All Distances
 
@@ -787,6 +1059,7 @@ class multi_galaxy_siblings:
 			lines = self.print_table(PARS=PPARS,returner=True)
 			lines = [ll.split('\\\\')[0] for ll in lines if ll!='\\midrule']
 			dfsummaries = pd.DataFrame([re.sub(r'\s+','',ll).split('&') for ll in lines],columns=['SN','GalaxyID']+PPARS)
+			dfsummaries['SN'] = dfsummaries['SN'].apply(lambda x: x.replace('\_','_'))
 			dfsummaries[[f'{pp}bunched' for pp in PPARS]] = dfsummaries[PPARS].apply(lambda x: ['\pm' not in xi for xi in x],axis=1,result_type='expand')
 			for pp in PPARS:
 				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}68'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: x.split('(')[0].split('$')[1][1:])
@@ -795,9 +1068,9 @@ class multi_galaxy_siblings:
 
 		#Create plot
 		if multiplot:
-			fig,ax = pl.subplots(len(PARS),1,figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')),6*len(PARS)),sharex='col',sharey=False,squeeze=False)
+			fig,ax = pl.subplots(len(PARS),1,figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')+0.5*(annotate_mode is None)),6*len(PARS)),sharex='col',sharey=False,squeeze=False)
 		else:
-			fig,ax = pl.subplots(1,1,figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')),7.2),sharex='col',sharey=False,squeeze=False)
+			fig,ax = pl.subplots(1,1,figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')+0.5*(annotate_mode is None)),7.2),sharex='col',sharey=False,squeeze=False)
 			iax=0
 
 		#Get colours markers
@@ -833,15 +1106,24 @@ class multi_galaxy_siblings:
 			if PAR=='etaAV':	ylabel = r"$\hat{\eta}^s_{A_V} - \overline{\hat{\eta}^s_{A_V}}$ (mag)" if subtract_mean else r"$\hat{\eta}^s_{A_V}$ (mag)"	;	pword = 'Repar. Dust Extinction'
 
 			if iax==0:
-				fig.axes[0].set_title(f"Individual Siblings {pword if not multiplot else 'Parameter'} Estimates",weight='bold',fontsize=self.FS+1)
+				if g_or_z=='z' and not multiplot and PAR=='mu':
+					if zword=='zcmb_hats':
+						fig.axes[0].set_title(f"Hubble Diagram",weight='bold',fontsize=self.FS+3)
+					else:
+						pass
+				else:
+					fig.axes[0].set_title(f"Individual Siblings {pword if not multiplot else 'Parameter'} Estimates",weight='bold',fontsize=self.FS+1)
 
+			if 'include_std' in kwargs and kwargs['include_std'] and g_or_z=='z' and PAR=='mu':
+				HRs = [mm[0]-mm[1] for igal,gal in enumerate(Ng) for mm in self.dfmus[self.dfmus['Galaxy']==gal][[f'{PAR}s',f'muext_{zword}']].values]
+				fig.axes[iax].annotate(r'Std. Dev. = %s$\,$mag'%(round(np.std(HRs),3)),xy=(0.1,0.1),xycoords='axes fraction',weight='bold',fontsize=self.FS+2,ha='left')
 			#For each galaxy, plot distances
 			for igal,gal in enumerate(Ng):
 				dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
 				mus,muerrs,SNe,Sg = dfgal[f'{PAR}s'].values,dfgal[f'{PAR}_errs'].values,dfgal['SN'].values,dfgal.shape[0]
 				if PAR=='mu':	fullerrors = np.array([plot_sigma0**2 + err**2 for err in muerrs])**0.5
 				xgs   = np.array([mini_d*(ss-(Sg-1)/2) for ss in range(Sg)]) + x_coords[igal]
-				mubar = np.average(mus) if g_or_z=='g' or PAR!='mu' else cosmo.distmod(x_coords[igal]).value
+				mubar = np.average(mus) if g_or_z=='g' or PAR!='mu' else dfgal[f'muext_{zword}'].values[0]#cosmo.distmod(x_coords[igal]).value
 				#Add sigmaext error for HRs
 				if g_or_z=='z' and PAR=='mu':
 					mu_full_errs = np.array([get_muext_err(zhelerr,x_coords[igal])**2+muerr**2 for muerr,zhelerr in zip(muerrs,dfgal['zhelio_errs'].values)])**0.5
@@ -864,9 +1146,10 @@ class multi_galaxy_siblings:
 							fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=mu_full_errs[ss],color=colours[igal],marker=None,markersize=0,alpha=0.5,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
 							#Plot zcmb
 							zcmb = self.dfmus[self.dfmus['SN']==SNe[ss]]['zcmb_hats'].values[0]
-							fig.axes[iax].errorbar(xgs[ss]-x_coords[igal]+zcmb,mu-cosmo.distmod(zcmb).value,yerr=err,color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.2,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
+							mucmb = self.dfmus[self.dfmus['SN']==SNe[ss]]['muext_zcmb_hats'].values[0]
+							fig.axes[iax].errorbar(xgs[ss]-x_coords[igal]+zcmb,mu-mucmb,yerr=err,color=colours[igal],marker=markers[igal],markersize=markersize,alpha=0.2,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
 							mu_zcmb_full_errs = np.array([get_muext_err(zhelerr,zcmb)**2+muerr**2 for muerr,zhelerr in zip(muerrs,dfgal['zhelio_errs'].values)])**0.5
-							fig.axes[iax].errorbar(xgs[ss]-x_coords[igal]+zcmb,mu-cosmo.distmod(zcmb).value,yerr=mu_zcmb_full_errs[ss],color=colours[igal],marker=None,markersize=0,alpha=0.1,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
+							fig.axes[iax].errorbar(xgs[ss]-x_coords[igal]+zcmb,mu-mucmb,yerr=mu_zcmb_full_errs[ss],color=colours[igal],marker=None,markersize=0,alpha=0.1,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize)
 
 						fig.axes[iax].errorbar(xgs[ss],mu-mubar*subtract_mean,yerr=err,     										color=colours[igal],marker=markers[igal],markersize=markersize,alpha=alpha,elinewidth=elw,markeredgewidth=mew,          linestyle='none',capsize=capsize, label=lab)
 
@@ -918,12 +1201,12 @@ class multi_galaxy_siblings:
 		if annotate_mode=='legend':
 			#If/else because latter is weird fig rescaling for single panel plot
 			if not multiplot:
-				if g_or_z=='z':#Remove errorbars from legend
-					lines, labels = fig.axes[-1].get_legend_handles_labels()
-					lines = [h[0] if isinstance(h, container.ErrorbarContainer) else h for h in lines]
-					fig.axes[0].legend(lines,labels,fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
-				else:
-					fig.axes[0].legend(fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+				#if g_or_z=='z':#Remove errorbars from legend
+				lines, labels = fig.axes[-1].get_legend_handles_labels()
+				lines = [h[0] if isinstance(h, container.ErrorbarContainer) else h for h in lines]
+				fig.axes[0].legend(lines,labels,fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+				#else:
+				#	fig.axes[0].legend(fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
 			else:
 				lines, labels = fig.axes[-1].get_legend_handles_labels()
 				if g_or_z=='z':#Remove errorbars from legend
@@ -936,7 +1219,7 @@ class multi_galaxy_siblings:
 		#fig.subplots_adjust(wspace=0, hspace=0)
 		pl.tight_layout()
 		if save:
-			pl.savefig(f"{self.plotpath}{PAR if not multiplot else 'Parameter'}s_{g_or_z}.pdf", bbox_inches="tight")
+			pl.savefig(f"{self.plotpath}{PAR if not multiplot else 'Parameter'}s_{g_or_z if g_or_z!='z' else zword}.pdf", bbox_inches="tight")
 		if show:
 			pl.show()
 
@@ -1355,7 +1638,7 @@ class siblings_galaxy:
 			#if leglabel=='':
 			if leglabel!='':
 				Yoff += -0.2
-			fig.axes[0].annotate('Prior Distribution',xy=(Xoff,Yoff+dY),			   xycoords='axes fraction',fontsize=15.5, ha='left')
+			fig.axes[0].annotate('Hyperprior',xy=(Xoff,Yoff+dY),			   xycoords='axes fraction',fontsize=15.5, ha='left')
 			LABEL = r'$\sigma_{\rm{Rel}} \sim U (0,%s)$'%(str(round(float(prior_upper_bound),3)))
 			fig.axes[0].annotate(LABEL,xy=(Xoff,Yoff-dY*ip),xycoords='axes fraction',fontsize=self.FS-dfs,color=ccc,ha='left')
 			#~~~
