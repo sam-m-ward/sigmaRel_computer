@@ -11,4 +11,6 @@ model_files/stan_files/MultiGalFiles/altpriors/old/
 model_files/stan_files/MultiGalFiles/original_default_prior/
 model_files/stan_files/LKJ/generator
 model_files/stan_files/LKJ/generator.hpp
-
+model_files/test_flowcorrections_pantehon_mb.py
+model_files/test_flowcorrections_ztf_mb.py
+model_files/test_pantheon_corrections.py
