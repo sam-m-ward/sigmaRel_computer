@@ -1,6 +1,6 @@
 import sys
 
-rootpath = './'
+rootpath = '../'
 sys.path.append(rootpath+'model_files/')
 from sigmaRel import *
 
@@ -36,7 +36,7 @@ err=1/0
 
 
 #ANALYSE
-multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True)
+multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True,rootpath=rootpath)
 #multigal.trim_sample()
 '''#Print stats
 print (multigal.dfmus[multigal.dfmus.zhelio_errs>0.001]['mu_errs'].mean(),multigal.dfmus[multigal.dfmus.zhelio_errs>0.001]['mu_errs'].std())
@@ -119,7 +119,7 @@ for x in Summary_Strs:
 err=1/0
 #'''
 
-#'''#cosmodep overlays full and cosmo-subsample
+'''#cosmodep overlays full and cosmo-subsample
 overwrite=False
 multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,overwrite=overwrite,zcosmo='zcmb')
 postplot = multigal.plot_posterior_samples_1D(FS=20,pars=['rho','rel_rat2','com_rat2'],fig_ax=[None,0,2,[1,None],['Full Sample','[12 Galaxies]']],show=False, save=False,lines=True)
@@ -166,21 +166,19 @@ err=1/0
 #'''
 
 
-'''#Test sens to hyperpriors
+#'''#Test sens to hyperpriors
 zcosmo = 'zcmb'
 overwrite=False
 
 arcsine_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim \rm{Arcsine}(0,1)$"]
-#alt_prior_lines  = [r"$\sigma_{\rm{Rel}} \sim U(0,1)$", r"$\sigma_{\rm{Common}} \sim U(0,1)$"]
-#priorA_lines     = [r"$\sigma_{0} \sim U(0,1)$", r"$\sigma_{\rm{Rel}} \sim U(0,\sigma_0)$"]
-#priorB_lines     = [r"$\sigma_{0} \sim U(0,1)$", r"$\sigma_{\rm{Common}} \sim U(0,\sigma_0)$"]
-priorC_lines     = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]
+priorC_lines  = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]
 
 multigal.sigmaRel_sampler(alt_prior=False,sigma0='free',sigmapec=250,use_external_distances=True,zcosmo=zcosmo,overwrite=overwrite)
-postplot = multigal.plot_posterior_samples(fig_ax=[None,0,2,-2,arcsine_lines],show=False, save=False, quick=False)
-postplot = multigal.plot_posterior_samples(fig_ax=[postplot,0,2,-2,['']],show=False, save=False, quick=True)
+postplot = multigal.plot_posterior_samples(fig_ax=[None,0,2,[None,-2],arcsine_lines],show=False, save=False, quick=False)
+postplot = multigal.plot_posterior_samples(fig_ax=[postplot,0,2,[None,-2],['']],show=False, save=False, quick=True)
+
 multigal.sigmaRel_sampler(alt_prior='C',sigma0='free',sigmapec=250,use_external_distances=True,zcosmo=zcosmo,overwrite=overwrite)
-postplot = multigal.plot_posterior_samples(fig_ax=[postplot,1,2,0,priorC_lines],show=False,save=False, quick=True)
+postplot = multigal.plot_posterior_samples(fig_ax=[postplot,1,2,[None,0],priorC_lines],show=False,save=False, quick=True)
 #Add common lines
 dy  = (0.15-0.02*(len(postplot.parnames)<4)) ; yy0 = postplot.y0-0.35+0.06*(len(postplot.parnames)<4) ; FS  = 18-4 - 2*(len(postplot.parnames)<4)
 counter = -1
@@ -188,7 +186,7 @@ for ticker,line in enumerate(postplot.lines):
     if ticker in [0,3,4]:
         counter += 1
         pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(counter-1)),xycoords='axes fraction',fontsize=FS,color='black',ha='right')
-postplot = multigal.plot_posterior_samples(fig_ax=[postplot,1,2,0,['']],show=False,save=True, quick=False,blind=True)
+postplot = multigal.plot_posterior_samples(fig_ax=[postplot,1,2,[None,0],['']],show=False,save=True, quick=False)
 #'''
 
 
@@ -196,30 +194,12 @@ postplot = multigal.plot_posterior_samples(fig_ax=[postplot,1,2,0,['']],show=Fal
 '''#Multi-model overlay (mu, z, z w/ mu-zhelio) 1D OVERLAY
 overwrite=False
 #multigal.n_warmup   = 3000 ; multigal.n_sampling = 14000 ; overwrite=True
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior=True,overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=False)
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,overwrite=overwrite,zcosmo='zcmb')
+postplot = multigal.plot_posterior_samples_1D(fig_ax=[None,0,3,[None,-1],[r'Modelled $\hat{z}_{\rm{CMB}}$ Distances']],show=False, save=False, lines=True)
 
-postplot = multigal.plot_posterior_samples_1D(blind=True, fig_ax=[None,0,3,-1,[r'Modelled $\hat{z}_{\rm{CMB}}$ Distances']],show=False, save=False, quick=True, lines=True)
-postplot = multigal.plot_posterior_samples_1D(blind=True, fig_ax=[postplot,0,3,-1,['']],show=False, save=False, quick=False,lines=True)
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,overwrite=overwrite,zcosmo='zcmb',alpha_zhel=False)
+postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,1,3,[None,None],[r'Modelled $z_{\rm{CMB}}$ Parameters']],show=False, save=False,lines=True)
 
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,alt_prior=True,overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=False)
-postplot = multigal.plot_posterior_samples_1D(blind=True, fig_ax=[postplot,1,3,None,[r'Modelled $z_{\rm{CMB}}$ Parameters']],show=False, save=False, quick=False,lines=True)
-
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,alt_prior=True,overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=True)
-postplot = multigal.plot_posterior_samples_1D(blind=True, fig_ax=[postplot,2,3,-2,[r'Modelled $z_{\rm{CMB}}$ Parameters +',r'$\epsilon_{\mu} = \hat{\alpha} \epsilon_{z_{\rm{Helio}}}$ for 3 Galaxies']],show=False, save=True, quick=False,lines=True)
-#'''
-
-'''#Multi-model overlay (mu, z, z w/ mu-zhelio) 2D CORNER PLOT
-overwrite=False
-#multigal.n_warmup   = 2000 ; multigal.n_sampling = 10000 ; overwrite=True
-
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=False,alt_prior='C',overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=False)
-
-postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[None,0,3,-1,[r'Modelled $\hat{z}_{\rm{CMB}}$ Distances']],show=False, save=False, quick=True)
-postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[postplot,0,3,-1,['']],show=False, save=False, quick=False)
-
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,alt_prior='C',overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=False)
-postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[postplot,1,3,None,[r'Modelled $z_{\rm{CMB}}$ Parameters']],show=False, save=False, quick=False)
-
-multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,alt_prior='C',overwrite=overwrite,blind=True,zcosmo='zcmb',alpha_zhel=True)
-postplot = multigal.plot_posterior_samples(blind=True, fig_ax=[postplot,2,3,-2,[r'Modelled $z_{\rm{CMB}}$ Parameters +',r'$\epsilon_{\mu} = \hat{\alpha} \epsilon_{z_{\rm{Helio}}}$ for 3 Galaxies']],show=False, save=True, quick=False)
+multigal.sigmaRel_sampler(sigma0='free',sigmapec=250,use_external_distances=True,zmarg=True,overwrite=overwrite,zcosmo='zcmb',alpha_zhel=True)
+postplot = multigal.plot_posterior_samples_1D(fig_ax=[postplot,2,3,[None,-2],[r'Modelled $z_{\rm{CMB}}$ Parameters +',r'$\epsilon_{\mu} = \hat{\alpha} \epsilon_{z_{\rm{Helio}}}$ for 3 Galaxies']],show=False, save=True,lines=True)
 #'''
