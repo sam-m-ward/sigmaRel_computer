@@ -164,8 +164,11 @@ class ModelLoader:
 				print ("Marginalising over large zhelio error galaxies")
 				modelkey += f"_alphazhelio"
 		if self.alt_prior:
-			print (f"Using Alternative Prior")
+			print (f"Using Alternative Prior"+str(self.alt_prior)*(self.alt_prior!=True))
 			modelkey += f"_altprior"
+			if self.alt_prior!=True:
+				modelkey+= f'{self.alt_prior}'
+
 		self.modelkey = modelkey
 		print ('###'*10)
 
@@ -190,7 +193,10 @@ class ModelLoader:
 		Saves current_model.stan file with appropriately edited lines
 		"""
 		#Update stan file according to choices, create temporary 'current_model.stan'
-		self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+		if self.alt_prior in [False,True]:
+			self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+		else:
+			self.stan_filename = f'altpriors/sigmaRel_withmuext_alt{self.alt_prior}.stan'
 		#self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt5.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
 		if self.zmarg:	self.stan_filename = self.stan_filename.replace('.stan','_zmarg.stan')
 		with open(self.stanpath+self.stan_filename,'r') as f:
@@ -333,7 +339,7 @@ class ModelLoader:
 		----------
 		pars with appropriate parameter names removed
 		"""
-		pars=['sigma0','sigmapec','rho','sigmaRel','sigmaCommon']
+		pars=['rho','sigma0','sigmaRel','sigmaCommon','sigmapec']
 		if self.sigma0!='free':
 			pars.remove('sigma0')
 			pars.remove('rho')
