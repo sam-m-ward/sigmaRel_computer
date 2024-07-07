@@ -9,7 +9,7 @@ Contains:
 --------------------
 Functions:
 	kde(x_data, x_target, y_data=None, y_target=None, x_bounds=None, y_bounds=None, smoothing=1.0)
-	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None, lines=True)
+	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None,lines=True,oneD=False)
 	get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel)
 
 POSTERIOR_PLOTTER class:
@@ -19,9 +19,10 @@ POSTERIOR_PLOTTER class:
 		update_lims(Nsig=3)
 		corner(fig_ax, Ngrid=30, colour="C0", warn_tolerance=0.05, FS=15, blind=False)
 		corner_plot(verbose=True, blind=False, colour=None, multiplot=False)
+		plot_1Drow(verbose=True,blind=False, colour=None, multiplot=False)
 
 PARAMETER class:
-	inputs: chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None
+	inputs: chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None,oneD=False
 
 	Methods are:
 		get_xgrid(fac=0.1)
@@ -311,7 +312,10 @@ class POSTERIOR_PLOTTER:
 		ax[d-1,d-1].set_xlabel(names[d-1],fontsize=FS)
 		ax[d-1,d-1].tick_params(labelsize=FS)
 		fig.subplots_adjust(top=0.9)
-		fig.subplots_adjust(wspace=0.075, hspace=0.075)
+		fig.subplots_adjust(wspace=0.08, hspace=0.08)#wspace=0.075, hspace=0.075)
+		for col in range(d):#Helps remove overlapping axis tick numbers
+			new_xlabels = [x.get_text() if float(x.get_text()) not in [0,0.1,1] else {0:'0',0.1:'0.1',1:'1'}[float(x.get_text())] for x in ax[d-1,col].get_xticklabels()]
+			ax[d-1,col].set_xticklabels(new_xlabels)
 		self.fig = fig
 		self.ax  = ax
 
@@ -351,7 +355,8 @@ class POSTERIOR_PLOTTER:
 			fig,ax = pl.subplots(len(pardict),len(pardict),figsize=(sfigx,sfigy),sharex='col',sharey=False)
 		else:
 			fig,ax = self.fig,self.ax
-		if len(pardict)==1:	ax = np.array([[ax]])
+		if len(pardict)==1 and str(type(ax))=="<class 'matplotlib.axes._axes.Axes'>":#Latter condition for when multiplot so np.array conversion already applied
+			ax = np.array([[ax]])
 
 		if verbose: print ("###"*5)
 		Summary_Strs = {}
@@ -364,6 +369,72 @@ class POSTERIOR_PLOTTER:
 		#Plot 2D marginals
 		self.corner([fig,ax],blind=blind,colour=colour)
 		if verbose: print ("Corner samples/contours plotted successfully")
+		return Summary_Strs
+
+	def plot_1Drow(self,verbose=True,blind=False, colour=None, multiplot=False):
+		"""
+		Plot 1D Row
+
+		Method to plot the posterior samples; plot row of 1D marginal panels
+		Method very similar to corner_plot
+
+		Parameters
+		----------
+		verbose: bool (optional; default=True)
+			print out summaries
+
+		blind : bool (optional; default=False)
+			option to mask posterior results
+
+		colour : None or str (optional; default=None)
+			if None, use default value, otherwise, use input str
+
+		multiplot : bool or list (optional; default=False)
+			if not False, input should be list e.g. [0,3] meaning the first of 3 panels
+
+		End Product(s)
+		----------
+		Summary_Strs: dict
+			each value is the parameters' Summary_Str: the posterior summary statistic that is displayed in the plot
+		"""
+
+		bounds  = self.bounds
+		chains  = self.chains
+		pardict = self.pardict
+		FS = 15
+
+		#Create figure
+		if 'fig' not in self.__dict__.keys() and 'ax' not in self.__dict__.keys():
+			sfigx,sfigy = 3.1*len(pardict),2.7
+			fig,ax = pl.subplots(1,len(pardict),figsize=(sfigx,sfigy),sharex='col',sharey=False)
+			ax = np.array([ax]).reshape(1,-1)
+		else:
+			fig,ax = self.fig,self.ax
+		if len(pardict)==1 and str(type(ax))=="<class 'matplotlib.axes._axes.Axes'>":#Latter condition for when multiplot so np.array conversion already applied
+			ax = np.array([[ax]])
+
+		if verbose: print ("###"*5)
+		Summary_Strs = {}
+		for col,parname in enumerate(self.pardict):#Get Conf Intervals Here
+			parameter = PARAMETER(self.chains[col],parname,self.pardict[parname],self.lims[col],self.bounds[col],self.Rhats[parname],col,self.choices,self.smoothing,oneD=True)
+			parameter.get_xgrid_KDE()
+			#Plot 1D Marginal KDEs
+			Summary_Strs[parname] = parameter.plot_marginal_posterior(ax,verbose=verbose,blind=blind,colour=colour,multiplot=multiplot)
+			if verbose: print ("###"*5)
+			ax[0,col].tick_params(labelsize=FS)
+			ax[0,col].set_xlabel(self.pardict[parname],fontsize=FS)
+			ax[0,col].set_xlim(*self.lims[col])
+			ax[0,col].set_yticks([])
+			if blind:
+				ax[0,col].set_xticks([])
+			else:
+				new_xlabels = [x if float(x.get_text()) not in [0,0.1,1] else {0:'0',0.1:'0.1',1:'1'}[float(x.get_text())] for x in ax[0,col].get_xticklabels()]
+				ax[0,col].set_xticklabels(new_xlabels)
+				#ax[0,col].set_ylim([0,ax[0,col].get_ylim()[1]])
+		ax[0,0].set_ylabel('Posterior Density',fontsize=FS)
+		self.fig = fig
+		self.ax  = ax
+		if verbose: print ("1D marginals plotted plotted successfully")
 		return Summary_Strs
 
 class PARAMETER:
@@ -428,7 +499,7 @@ class PARAMETER:
 		self.xgrid = xgrid
 		self.KDE   = KDE
 
-	def __init__(self,chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None):
+	def __init__(self,chain,parname,parlabel,lim,bound,Rhat,row,choices,smoothing=2,XGRID=None,oneD=False):
 		"""
 		See POSTERIOR_PLOTTER class docstring for input descriptions
 		"""
@@ -442,6 +513,7 @@ class PARAMETER:
 		self.choices   = choices
 		self.smoothing = smoothing #Smoothing for 1D marginal KDE
 		self.XGRID     = XGRID
+		self.oneD      = oneD
 
 		self.Nsamps      = len(self.chain)
 		self.samp_median = np.median(self.chain)
@@ -562,11 +634,12 @@ class PARAMETER:
 		y0 = len(ax)-0.85 ;
 		delta_y = 0.15 ; Summary_Str = ''
 		#For multiplot
+		xrow = row*(not self.oneD)+0*self.oneD
 		x0 = 0.5; dy = 0.15-0.03*(len(ax)<4) ; y0 = 0.05 ; ha = 'center'
-		if not paperstyle: ax[row,row].set_title(r'$\hat{R}$('+self.parlabel.split(' (')[0]+f') = {self.Rhat:.3}')
+		if not paperstyle: ax[xrow,row].set_title(r'$\hat{R}$('+self.parlabel.split(' (')[0]+f') = {self.Rhat:.3}')
 
 		#Plot KDE
-		ax[row,row].plot(xgrid, KDE, color=colour)
+		ax[xrow,row].plot(xgrid, KDE, color=colour)
 		ax[-1,row].set_xlim(*self.lim)
 
 		#KDE doesnt peak at prior boundary
@@ -576,16 +649,36 @@ class PARAMETER:
 		imode, xmode, KDEmode = self.get_KDE_values(location='mode')
 		condition2 = not (KDE[0]>=hh*KDEmode or KDE[-1]>=hh*KDEmode)
 
+		condition3=False ; Ncrosses=0
+		if parname in ['rho','rel_rat','com_rat','rel_rat2','com_rat2']:#Check for strong bimodality in 1D KDE ('strong' assessed by step size in gradient)
+			step = int(0.1*len(xgrid))
+			dKDE = KDE[::step][1:] - KDE[::step][:-1]
+			crosses = [i for i,k1,k2 in zip(np.arange(len(dKDE)-1),dKDE[:-1],dKDE[1:]) if k1/k2<0]
+			#if len(crosses)>1:
+			Ncrosses = len(crosses)
+			condition3 = True
+			'''#Plot gradient change detector
+			pl.figure()
+			for i in crosses:pl.scatter(np.array([xgrid[::step][i],xgrid[::step][i+1]])++(xgrid[step]-xgrid[0]),[dKDE[i],dKDE[i+1]])
+			pl.plot(xgrid,KDE)
+			pl.plot(xgrid[::step][:-1]+(xgrid[step]-xgrid[0]),dKDE)
+			pl.plot(xgrid[:-1],KDE[1:]-KDE[:-1])
+			pl.show()
+			#'''
+
 		#If typical Gaussian-like posterior, plot median, 16 and 84th percentiles
-		if verbose: print (f"5%, 50%, 68%, 95% quantiles: {round(self.dfchain.par.quantile(0.05),2)}, {round(self.dfchain.par.quantile(0.5),2)}, {round(self.dfchain.par.quantile(0.68),2)},{round(self.dfchain.par.quantile(0.95),2)}")
-		if condition1 and condition2:
+		if verbose:
+			if parname=='sigma0':
+				print ('p_sigma0_0.094:',round(100*sum([1 for s in self.dfchain.par if s<0.094])/len(self.dfchain.par),3),'%')
+			print (f"5%, 50%, 68%, 95% quantiles: {round(self.dfchain.par.quantile(0.05),2)}, {round(self.dfchain.par.quantile(0.5),2)}, {round(self.dfchain.par.quantile(0.68),2)},{round(self.dfchain.par.quantile(0.95),2)}")
+		if condition1 and condition2 and Ncrosses<2:
 			if verbose: print (f"{parname}: {round(self.samp_median,2)} +/- {round(self.samp_std,2)}; 16th and 84th intervals: -{round(self.dfchain.par.quantile(0.5)-self.dfchain.par.quantile(0.16),2)}+{round(self.dfchain.par.quantile(0.84)-self.dfchain.par.quantile(0.5),2)}")
 			#Plot median and 16th 84th quantiles
 			i_med, x_med, KDE_med = self.get_KDE_values(value=self.samp_median)
-			ax[row,row].plot(np.ones(2)*x_med,[0,KDE_med],c=colour)
+			ax[xrow,row].plot(np.ones(2)*x_med,[0,KDE_med],c=colour)
 			i_16 = self.get_KDE_values(value=self.dfchain.par.quantile(0.16),return_only_index=True)
 			i_84 = self.get_KDE_values(value=self.dfchain.par.quantile(0.84),return_only_index=True)+1
-			ax[row,row].fill_between(xgrid[i_16:i_84],np.zeros(i_84-i_16),KDE[i_16:i_84],color=colour,alpha=alph)
+			ax[xrow,row].fill_between(xgrid[i_16:i_84],np.zeros(i_84-i_16),KDE[i_16:i_84],color=colour,alpha=alph)
 			if not paperstyle:
 				pl.annotate("%s ="%parlabel.split(' (')[0],                     xy=(0.3  ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')#String broken up for alignment
 				if parname=='sigmapec':
@@ -606,63 +699,107 @@ class PARAMETER:
 				if blind: summary = ['0.X','0.X','0.X']
 				Summary_Str = f"${summary[0]}^{str('{')}+{summary[1]}{str('}')}_{str('{')}-{summary[2]}{str('}')}$"
 
-				if not multiplot:	ax[row,row].set_title(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), fontsize=FS)
+				if not multiplot:	ax[xrow,row].set_title(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]), fontsize=FS)
 				else:
 					counter,Npanels = multiplot[:]
 					if counter!=-1:#If it is equal -1 this is code for don't annotate
-						ax[row,row].annotate(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]),xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
+						ax[xrow,row].annotate(parlabel.split(' (')[0] + " = $%s ^{+%s}_{-%s}$"%(summary[0],summary[1],summary[2]),xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
 				#ax[row,row].set_title(parlabel + " = {:.2f} $\pm$ {:.2f}".format(self.samp_median, self.samp_std), fontsize=FS)
 				#summary = ["{:.2f}".format(x) for x in [self.samp_median, self.samp_std,self.dfchain.par.quantile(0.95),self.dfchain.par.quantile(0.05)]]
 				#Summary_Str = f"${summary[0]}\\pm {summary[1]}^{str('{')}\\,\\,{summary[2]}{str('}')}_{str('{')}\\,\\,{summary[3]}{str('}')}$"
 		#Otherwise, posterior peaks at/near prior boundary, choose to summarise posterior using quantiles
 		else:
-			storeinfo = {}
-			for ic,conf in enumerate([0.68,0.95]):
-				if imode>0.5*(len(xgrid)-1):#If peaks at RHS
-					CONF = copy.deepcopy(1-conf)
-					lg = '>'
-					irange = [None,len(xgrid)]
+			if condition3 and Ncrosses>=2:#Bimodal rho posterior
+				storeinfo={0.5:self.dfchain.par.quantile(0.5)}
+				#Plot median
+				null, x_med, KDE_med = self.get_KDE_values(value=self.dfchain.par.quantile(0.5))
+				ax[xrow,row].plot(np.ones(2)*x_med,[0,KDE_med],c=colour)
+				#Plot rho=0.5
+				i_conf, x_conf, KDE_conf = self.get_KDE_values(value=0.5)
+				ax[xrow,row].plot(np.ones(2)*x_conf,[0,KDE_conf],c=colour,linestyle='--')
+				ax[xrow,row].fill_between(xgrid[0:i_conf],np.zeros(i_conf),KDE[:i_conf],color=colour,alpha=alph)
+				text_height = self.get_KDE_values(value=0.25)[2]/2
+				if paperstyle:
+					if blind:
+						p_rhohalf  = 0.5
+						summarystr = parlabel.split(' (')[0] + f"0.X"
+						ax[xrow,row].annotate(str("X%"),xy=(x_conf/2,text_height),color=colour,fontsize=FS+1,weight='bold',ha='center')
+					else:
+						p_rhohalf   = int(round(100*sum([1 for s in self.dfchain.par if s<0.5])/len(self.dfchain.par),0))
+						summarystr  = 'Median-'+parlabel.split(' (')[0] + f"={storeinfo[0.5]:.2f}"
+						if not multiplot:
+							summarystr += '\n'
+							summarystr += 'p('+parlabel.split(' (')[0]+'<0.5)='+f'{p_rhohalf}%'
+						ax[xrow,row].annotate(str(int(p_rhohalf))+str("%"),xy=(x_conf/2,text_height),color=colour,fontsize=FS+1,weight='bold',ha='center')
+
+					if not multiplot:
+						ax[xrow,row].set_title(summarystr, fontsize=FS)
+					else:
+						counter,Npanels = multiplot[:]
+						if counter!=-1:#If it is equal -1 this is code for don't annotate
+							ax[xrow,row].annotate(summarystr,xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
+				print (paperstyle, blind, )
+				Summary_Str = f"{storeinfo[0.5]:.2f} & {p_rhohalf}\%"
+				if verbose:
+					print (f"{parname} {storeinfo[0.5]:.2f} {p_rhohalf}")
+			else:
+				storeinfo = {}
+				for ic,conf in enumerate([0.68,0.95]):
+					if imode>0.5*(len(xgrid)-1):#If peaks at RHS
+						CONF = copy.deepcopy(1-conf)
+						lg = '>'
+						irange = [None,len(xgrid)]
+					else:
+						CONF = copy.deepcopy(conf)
+						irange = [0,None]
+						lg = '<'
+
+					storeinfo[conf] = self.dfchain.par.quantile(CONF)
+
+					i_conf, x_conf, KDE_conf = self.get_KDE_values(value=self.dfchain.par.quantile(CONF))
+					irange = [i if i is not None else i_conf for i in irange]
+
+					ax[xrow,row].plot(np.ones(2)*x_conf,[0,KDE_conf],c=colour)
+					ax[xrow,row].fill_between(xgrid[irange[0]:irange[1]],np.zeros(irange[1]-irange[0]),KDE[irange[0]:irange[1]],color=colour,alpha=alph*(1-0.5*ic)*0.5)#half factor because gets doubled over
+					if not multiplot:#Dont plot 68% annotations for multiplot because it gets messy
+						#For RHS Boundary
+						if irange[-1]==len(xgrid):
+							ax[xrow,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf,KDE_conf+0.08*KDEmode),color=colour,fontsize=FS+1,weight='bold',ha='right' if ic==0 or ic==1 and i_conf/len(xgrid)>0.1 else 'left')
+						#For LHS Boundary
+						elif irange[0]==0:         ax[xrow,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf,KDE_conf),color=colour,fontsize=FS+1,weight='bold')
+
+					if not paperstyle:
+						pl.annotate("%s %s"%(parlabel,lg),xy=(0.3  ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')#{'<':'right','>':'left'}[lg])
+						if ic==0: pl.annotate("{:.3f}".format(x_conf),  xy=(0.65 ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')
+						if ic==1: pl.annotate("({:.3f})".format(x_conf),xy=(0.735,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
+
+				if paperstyle:
+					if blind:
+						summarystr = parlabel.split(' (')[0] + f" {lg} 0.X (0.X)"
+					else:
+						if 'sigma' in parlabel and 'sigma' in parname:	summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.3f} ({storeinfo[0.95]:.3f})"
+						else:					summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})"
+					if not multiplot:	ax[xrow,row].set_title(summarystr, fontsize=FS)
+					else:
+						counter,Npanels = multiplot[:]
+						if counter!=-1:#If it is equal -1 this is code for don't annotate
+							ax[xrow,row].annotate(summarystr,xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
+
+				if parname=='rho':
+					Summary_Str = f"{self.dfchain.par.quantile(0.5):.2f} & {int(round(100*sum([1 for s in self.dfchain.par if s<0.5])/len(self.dfchain.par),0))}\%"+f" & ${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
 				else:
-					CONF = copy.deepcopy(conf)
-					irange = [0,None]
-					lg = '<'
+					Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
+				if verbose:
+					if parname=='rho':
+						print ('Median rho:',self.dfchain.par.quantile(0.5))
+						print ('p_rhohalf:',int(round(100*sum([1 for s in self.dfchain.par if s<0.5])/len(self.dfchain.par),0)))
+					print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
 
-				storeinfo[conf] = self.dfchain.par.quantile(CONF)
-
-				i_conf, x_conf, KDE_conf = self.get_KDE_values(value=self.dfchain.par.quantile(CONF))
-				irange = [i if i is not None else i_conf for i in irange]
-
-				ax[row,row].plot(np.ones(2)*x_conf,[0,KDE_conf],c=colour)
-				ax[row,row].fill_between(xgrid[irange[0]:irange[1]],np.zeros(irange[1]-irange[0]),KDE[irange[0]:irange[1]],color=colour,alpha=alph*(1-0.5*ic)*0.5)#half factor because gets doubled over
-				#For RHS Boundary
-				if irange[-1]==len(xgrid): ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf+(xgrid[-1]-xgrid[0]),KDE_conf+0.08*KDEmode),color=colour,fontsize=FS+1,weight='bold',ha='right')
-				#For LHS Boundary
-				elif irange[0]==0:         ax[row,row].annotate(str(int(round(CONF*100,0)))+str("%"),xy=(x_conf,KDE_conf),color=colour,fontsize=FS+1,weight='bold')
-				if not paperstyle:
-					pl.annotate("%s %s"%(parlabel,lg),xy=(0.3  ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')#{'<':'right','>':'left'}[lg])
-					if ic==0: pl.annotate("{:.3f}".format(x_conf),  xy=(0.65 ,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='right')
-					if ic==1: pl.annotate("({:.3f})".format(x_conf),xy=(0.735,y0-delta_y*(row+1)),xycoords='axes fraction',fontsize=FS,color=colour,ha='left')
-
-			if paperstyle:
-				if blind:
-					summarystr = parlabel.split(' (')[0] + f" {lg} 0.X (0.X)"
-				else:
-					summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})"
-				if not multiplot:	ax[row,row].set_title(summarystr, fontsize=FS)
-				else:
-					counter,Npanels = multiplot[:]
-					if counter!=-1:#If it is equal -1 this is code for don't annotate
-						ax[row,row].annotate(summarystr,xy=(x0,1+y0+dy*(Npanels-counter-1)),xycoords='axes fraction', ha=ha,fontsize=FS,color=colour)
-
-
-			Summary_Str = f"${lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})$"
-			if verbose: print (f"{parname} {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})")
-
-		ax[row,row].set_ylim([0,None])
+		if not multiplot: ax[xrow,row].set_ylim([0,None])
 		return Summary_Str
 
 
-def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None,lines=True):
+def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None,lines=True,oneD=False):
 	"""
 	Finish Corner Plot
 
@@ -693,6 +830,9 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=No
 	lines : bool (optional; default=True)
 		if True, plot lines
 
+	oneD : bool (optional; default=False)
+		if True, activates 1D row plot functions
+
 	End Product(s)
 	----------
 	plot that is saved and/or shown
@@ -701,12 +841,13 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=No
 	delta_y = 0.15
 	DX      = 0 + (len(ax)==1)*1.1
 	y0      = len(ax) if y0 is None else y0
-	pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,y0-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
+	if not oneD:
+		pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,y0-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
 	if lines:
 		for counter,line in enumerate(Lines):#og fontsize=15
 			pl.annotate(line, xy=(1+DX,y0-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')#weight='bold'
-	fig.subplots_adjust(top=0.9)
-	fig.subplots_adjust(wspace=0.075, hspace=0.075)
+	fig.subplots_adjust(top=0.9)#These lines can change axes labels, so ensure these lines are done before axis tick adjustments that are done in corner method (or are include here but are the same as just described)
+	fig.subplots_adjust(wspace=0.08, hspace=0.08)
 	if save:
 		pl.savefig(f"{plotpath}{savekey}.pdf",bbox_inches='tight')
 	if show:
@@ -817,10 +958,13 @@ def get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel):
 	sigmaRelstr = get_sigmaRelstr(fixed_sigmaRel, eta_sigmaRel_input)
 
 	Lines = add_siblings_galaxies(Ng, S_g)
-	if alt_prior:
+	if alt_prior==False:
+		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
+		Lines.append(r"$\rho \sim \rm{Arcsine}(0,1)$")
+	elif alt_prior==True:
 		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, 1.0, 'mag')
 		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Common}', sigmaRelstr, 1.0, 'mag')
-	else:
+	else:#Alt priors from list
 		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
 		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, '\sigma_0', 'mag')
 	if use_external_distances:
