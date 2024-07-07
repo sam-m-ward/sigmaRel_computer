@@ -314,8 +314,11 @@ class POSTERIOR_PLOTTER:
 		fig.subplots_adjust(top=0.9)
 		fig.subplots_adjust(wspace=0.08, hspace=0.08)#wspace=0.075, hspace=0.075)
 		for col in range(d):#Helps remove overlapping axis tick numbers
-			new_xlabels = [x.get_text() if float(x.get_text()) not in [0,0.1,1] else {0:'0',0.1:'0.1',1:'1'}[float(x.get_text())] for x in ax[d-1,col].get_xticklabels()]
-			ax[d-1,col].set_xticklabels(new_xlabels)
+			try:
+				new_xlabels = [x.get_text() if float(x.get_text()) not in [0,0.1,1] else {0:'0',0.1:'0.1',1:'1'}[float(x.get_text())] for x in ax[d-1,col].get_xticklabels()]
+				ax[d-1,col].set_xticklabels(new_xlabels)
+			except:
+				pass
 		self.fig = fig
 		self.ax  = ax
 
