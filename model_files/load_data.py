@@ -87,9 +87,9 @@ def get_l_b(RA, Dec):#For cosmic flows query
     b = coord.galactic.b.value
     return l,b
 
-def load_dfmus(chains_file='ZTFtest5', tau=0.252):
+def load_dfmus(chains_file='ZTFtest5',rootpath='../', tau=0.252):
     #LOAD IN POSTERIOR CHAINS AND CREATE DFMUS
-    chains_path = f'../../bayesn_for_ztf/bayesn-pre-release-dev/{chains_file}/{chains_file}_Samples/'
+    chains_path = f'{rootpath}../../bayesn_for_ztf/bayesn-pre-release-dev/{chains_file}/{chains_file}_Samples/'
     files = glob(chains_path+'*.npy')
     snes  = {ff.split(chains_path)[1].split('_ZTF_DR2.snana_chains.npy')[0]:ff for ff in files}
     dfmus = {'SN':[]} ; PARS = ['mu','AV','theta']
@@ -121,7 +121,7 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
         dfmus.loc[sn,Rhat_cols] = summary.loc[PARS]['R_hat'].values
 
     #LOAD IN SNE TO MAP SIBLINGS TO GALAXY ID
-    sng = '../../bayesn_for_ztf/bayesn-pre-release-dev/bayesn-data/lcs/meta/ztf_dr2_siblings_redshifts.txt'
+    sng = f'{rootpath}../../bayesn_for_ztf/bayesn-pre-release-dev/bayesn-data/lcs/meta/ztf_dr2_siblings_redshifts.txt'
     sng = pd.read_csv(sng,names=['SN','zhelio_hats'],sep='\s')
     sn_to_g = {sn:1+isn//2 for isn,sn in enumerate(sng.SN)}
 
@@ -141,7 +141,7 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     sng['zhelio_errs'] = sng['zhelio_hats'].apply(dec_place)
 
     #Get ra, dec
-    df_radeczhel = pd.read_csv('../../bayesn_for_ztf/bayesn-pre-release-dev/bayesn-data/lcs/meta/ztf_dr2_RADec_zhelio_roughestimates.txt',names=['SN','ra','dec','z_helio'],sep='\s')
+    df_radeczhel = pd.read_csv(f'{rootpath}../../bayesn_for_ztf/bayesn-pre-release-dev/bayesn-data/lcs/meta/ztf_dr2_RADec_zhelio_roughestimates.txt',names=['SN','ra','dec','z_helio'],sep='\s')
     df_radeczhel.set_index('SN',inplace=True)
     df_radeczhel.loc['ZTF20abmarcv_1'] = df_radeczhel.loc['ZTF20abmarcv'].iloc[0]#Two siblings on same pixel, introduce as new SNe
     df_radeczhel.loc['ZTF20abmarcv_2'] = df_radeczhel.loc['ZTF20abmarcv'].iloc[0]
@@ -156,7 +156,7 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     #Get text file for use in cosmic flows
     try:
         #df_flowcorr = pd.read_csv('products/table_for_cosmicflows_out.txt',skiprows=17,header=None,names=['long','lat','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
-        df_flowcorr = pd.read_csv('products/table_for_cosmicflows_v_out.txt',skiprows=17,header=None,names=['long','lat','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
+        df_flowcorr = pd.read_csv(f'{rootpath}products/table_for_cosmicflows_v_out.txt',skiprows=17,header=None,names=['long','lat','lg','bg','vcmb','x','DL','DA','vHD','vpec'],sep='\s+')
         assert(df_flowcorr.shape[0]==dfmus.shape[0])
         dfmus.loc[:,'zHD_hats'] = df_flowcorr['vHD'].values/299792.458
         dfmus.loc[:,'mu_cosmicflows'] = 5*np.log10(df_flowcorr['DL'].values)+25
@@ -165,7 +165,7 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
         #dfmus[['l','b','zcmb_hats']].to_csv('products/table_for_cosmicflows.txt',index=False,header=None,sep=' ')
         #dfmus[['ra','dec','zcmb_hats']].to_csv('products/table_for_cosmicflows.txt',index=False,header=None,sep=' ')
         dfmus['vcmb_hats'] = dfmus['zcmb_hats']*299792.458
-        dfmus[['ra','dec','vcmb_hats']].to_csv('products/table_for_cosmicflows_v.txt',index=False,header=None,sep=' ')
+        dfmus[['ra','dec','vcmb_hats']].to_csv(f'{rootpath}products/table_for_cosmicflows_v.txt',index=False,header=None,sep=' ')
         raise Exception('Please take products/table_for_cosmicflows.txt and upload to https://cosmicflows.iap.fr/table_query/ using J2000 galactic coords and velocity in c \n save as products/table_for_cosmicflows_out.txt')
 
     #For simplicity, take mean of zcmb and zHD (and zhelio is already same for both sibs)
@@ -193,7 +193,7 @@ def load_dfmus(chains_file='ZTFtest5', tau=0.252):
     try:
         dzhel_to_load = [0.01]
         for dzh in dzhel_to_load:
-            df_zgrid = pd.read_csv(f'products/sens_to_zhel/mu_dz{dzh}.csv').set_index('sn',drop=True)
+            df_zgrid = pd.read_csv(f'{rootpath}products/sens_to_zhel/mu_dz{dzh}.csv').set_index('sn',drop=True)
             dzhels = list(df_zgrid.columns)
             for sn in df_zgrid.index:
                 ys = []
