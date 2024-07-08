@@ -9,7 +9,7 @@ priorC_lines        = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]
 
 from simulate_distances import *
 
-Ng = 100 ; Sg = 2 ; RS=10
+Ng = 100 ; Sg = 2 ; RS=100
 tick_cross = dict(zip([True,False],['\\xmark','\\cmark']))
 Summary_Strs = []
 for rs in np.arange(RS):
@@ -17,7 +17,7 @@ for rs in np.arange(RS):
     for sigR,RHO in zip([0,0.1/((2)**0.5),0.1],[1,0.5,0]):
         print ((('#~#~#'*30)+'\n')*3)
         print (f'Performing: random_state={rs}/{RS}; sigR={sigR} equiv rho={RHO}')
-        print ((('#-#-#'*30)+'\n')*3)
+        print ('\n'+(('#-#-#'*30)+'\n')*3)
         simulator = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=sigR,zcmberr=1e-5,random=42+rs)
         dfmus     = simulator.dfmus
         dfmus['zhelio_hats'] = dfmus['zcmb_hats']
