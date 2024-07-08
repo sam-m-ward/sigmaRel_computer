@@ -217,10 +217,15 @@ class ModelLoader:
 						stan_file[il] = line.replace('real','//real')
 					if bool(re.match(r'\s*sigma0\s*~\s*uniform\(0,1\)',line)):
 						stan_file[il] = line.replace('sigma0','//sigma0')
-		stan_file = '\n'.join(stan_file)
-		print (stan_file)
-		with open(self.stanpath+'current_model.stan','w') as f:
-			f.write(stan_file)
+		stan_file = '\n'.join(stan_file)#The model required for current fit
+		with open(self.stanpath+'current_model.stan','r') as f:#The .stan file corresponding to current_model which is already compiled
+			current_stan_file = f.read()
+		if current_stan_file==stan_file:#If new model is same as current_model.stan, do nothing
+			pass
+		else:#Else, create new current_model.stan
+			print (stan_file)
+			with open(self.stanpath+'current_model.stan','w') as f:
+				f.write(stan_file)
 
 	def get_stan_data(self, dfmus):
 		"""
