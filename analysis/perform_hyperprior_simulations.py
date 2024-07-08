@@ -4,7 +4,7 @@ rootpath = '../'
 sys.path.append(rootpath+'model_files/')
 from sigmaRel import *
 
-beta_prior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim \textrm{Arcsine}(0,1)$"]
+arcsine_prior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim \textrm{Arcsine}(0,1)$"]
 priorA_lines     = [r"$\sigma_{0} \sim U(0,1)$", r"$\sigma_{\rm{Rel}} \sim U(0,\sigma_0)$"]
 priorB_lines     = [r"$\sigma_{0} \sim U(0,1)$", r"$\sigma_{\rm{Common}} \sim U(0,\sigma_0)$"]
 priorC_lines     = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]
@@ -37,7 +37,7 @@ for rs in [9]:
         counter = 0 ; print (savekey);
         recovery_str= tick_cross[RHO in []]
         multigal.sigmaRel_sampler(sigma0=sigma0,sigmapec=250,use_external_distances=True,zcosmo=zcosmo,overwrite=overwrite)
-        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[None,    counter,Np,[0,-2],''],returner=True); Summary_Strs.append(beta_prior_lines[-1]+' & \multirow{'+str(Np)+'}{*}{'+r'$\rho=%s$'%RHO+'} & '+' & '.join(list(summary.values())) + f'& {recovery_str} \\\\ ')
+        summary,postplot = multigal.plot_posterior_samples_1D(fig_ax=[None,    counter,Np,[0,-2],''],returner=True); Summary_Strs.append(arcsine_prior_lines[-1]+' & \multirow{'+str(Np)+'}{*}{'+r'$\rho=%s$'%RHO+'} & '+' & '.join(list(summary.values())) + f'& {recovery_str} \\\\ ')
         counter += 1; print (savekey)
 
         recovery_str=tick_cross[RHO in [0]]
