@@ -20,7 +20,7 @@ multi_galaxy class:
 		restore_sample()
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
-		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True,blind=False,zcosmo='zHD')
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, Rhat_threshold=np.inf, Ntrials=1)
 		add_transformed_params(df,fitsummary)
 		plot_posterior_samples(   FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
 		plot_posterior_samples_1D(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
@@ -391,7 +391,7 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, Rhat_threshold=np.inf, Ntrials=1):
 		"""
 		sigmaRel Sampler
 
@@ -443,6 +443,12 @@ class multi_galaxy_siblings:
 		alpha_zhel : bool (optional; default=False)
 			if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
 
+		Rhat_threshold : float (optional; default=np.inf)
+			float value if Rhat>Rhat_threshold redo fit with more samples, repeat for up to Ntrials times
+
+		Ntrials : int (optional; default=1)
+			no. of times to re-do fit with more samples to match Rhat threshold target
+
 		End Product(s)
 		----------
 		self.FIT, posterior samples saved in self.productpath
@@ -471,21 +477,30 @@ class multi_galaxy_siblings:
 			stan_init   = modelloader.get_stan_init(dfmus, self.productpath, self.n_chains)
 			self.pars   = modelloader.get_pars()
 
-			#Initialise and fit model
+			#Initialise model
 			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
-			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init, seed=42)
-			df          = fit.draws_pd()
+			#Fit model
+			for itrial in range(Ntrials):
+				BREAK = True
+				fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling*(1+itrial), iter_warmup = self.n_warmup, inits=stan_init, seed=42+itrial)
+				df          = fit.draws_pd()
+				#Thin samples
+				if df.shape[0]>self.n_thin*self.n_chains:#Thin samples
+					print (f'Thinning samples down to {self.n_thin} per chain to save on space complexity')
+					Nthinsize = int(self.n_thin*self.n_chains)
+					df = df.iloc[0:df.shape[0]:int(df.shape[0]/Nthinsize)]						#thin to e.g. 1000 samples per chain
+					dfdict = df.to_dict(orient='list')											#change to dictionary so key,value is parameter name and samples
+					fit = {key:np.array_split(value,self.n_chains) for key,value in dfdict.items()}	#change samples so split into chains
 
-			#Thin samples
-			if df.shape[0]>self.n_thin*self.n_chains:#Thin samples
-				print (f'Thinning samples down to {self.n_thin} per chain to save on space complexity')
-				Nthinsize = int(self.n_thin*self.n_chains)
-				df = df.iloc[0:df.shape[0]:int(df.shape[0]/Nthinsize)]						#thin to e.g. 1000 samples per chain
-				dfdict = df.to_dict(orient='list')											#change to dictionary so key,value is parameter name and samples
-				fit = {key:np.array_split(value,self.n_chains) for key,value in dfdict.items()}	#change samples so split into chains
+				#Fitsummary including Rhat valuess
+				fitsummary = az.summary(fit)#feed dictionary into arviz to get summary stats of thinned samples
 
-			#Fitsummary including Rhat valuess
-			fitsummary = az.summary(fit)#feed dictionary into arviz to get summary stats of thinned samples
+				#Check for high Rhat values
+				for par in self.pars:
+					if fitsummary.loc[par]['r_hat']>Rhat_threshold:
+						BREAK = False
+				if BREAK:	break
+				else:		print (f'Completed {itrial+1}/{Ntrials}; Repeating fit with more samples because of Rhats:',{par:fitsummary.loc[par]['r_hat'] for par in self.pars})
 
 			#Save samples
 			FIT = dict(zip(['data','summary','chains','modelloader'],[stan_data,fitsummary,df,modelloader]))
