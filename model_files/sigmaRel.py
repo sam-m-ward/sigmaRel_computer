@@ -374,7 +374,7 @@ class multi_galaxy_siblings:
 		#Initialisation
 		parnames   = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon','rel_rat','com_rat','rel_rat2','com_rat2']
 		dfparnames = ['sigma0','sigmapec','rho','sigmaRel','sigmaCommon','rel_rat','com_rat','rel_rat2','com_rat2']
-		parlabels  = ['$\\sigma_0$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)','$\\rho$','$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_{\\rm{Common}}$ (mag)','$\\sigma_{\\rm{Rel}}/\\sigma_0$','$\\sigma_{\\rm{Common}}/\\sigma_0$','$\\sigma^2_{\\rm{Rel}}/\\sigma^2_0$','$\\sigma^2_{\\rm{Common}}/\\sigma^2_0$']
+		parlabels  = ['$\\sigma_{0}$ (mag)','$\\sigma_{\\rm{pec}}$ (km$\,$s$^{-1}$)','$\\rho$','$\\sigma_{\\rm{Rel}}$ (mag)','$\\sigma_{\\rm{Common}}$ (mag)','$\\sigma_{\\rm{Rel}}/\\sigma_{0}$','$\\sigma_{\\rm{Common}}/\\sigma_{0}$','$\\sigma^2_{\\rm{Rel}}/\\sigma^2_{0}$','$\\sigma^2_{\\rm{Common}}/\\sigma^2_{0}$']
 		bounds     = [[0,1],[0,self.c_light],[0,1],[0,None],[0,None],[0,1],[0,1],[0,1],[0,1]]
 
 		#Filter on pars
