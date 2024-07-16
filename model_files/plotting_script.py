@@ -539,7 +539,7 @@ class PARAMETER:
 		#Get grid for KDE
 		self.get_xgrid()
 		#Get full reflection KDE
-		self.KDE = kde(self.chain, self.xgrid, x_bounds=self.bound, smoothing=self.smoothing)
+		self.KDE = kde(self.chain if str(type(self.chain))!="<class 'pandas.core.series.Series'>" else self.chain.values, self.xgrid, x_bounds=self.bound, smoothing=self.smoothing)
 		#Trim xgrid,KDE to reside within boundaries
 		self.slice_reflection_KDE()
 
