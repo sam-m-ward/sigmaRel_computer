@@ -11,7 +11,7 @@ SBC_FITS_PLOTTER class
 	Methods are:
 		get_SAMPS()
 		get_QUANTILES()
-		plot_sbc_panel(Ncred=True,Parcred=False,annotate_true=True,real_data_samps=False,plot_ind=True,plot_true=True,plot_medians=True,include_pmedian=True,dress_figure=True,fill_between=True,color='C0',linestyle='-',Lside=False,FAC=None,XGRID=None,line_sap_title=None,line_rec_title=None)
+		plot_sbc_panel(Ncred=True,Parcred=False,sap=None,annotate_true=True,real_data_samps=False,plot_ind=True,plot_true=True,plot_medians=True,include_pmedian=True,dress_figure=True,fill_between=True,color='C0',linestyle='-',Lside=False,FAC=None,XGRID=None,line_sap_title=None,line_rec_title=None)
 
 Functions are:
 	get_KEEPERS(GLOB_FITS,Nsim_keep,Rhat_threshold,loop_par,dfpar)
@@ -29,7 +29,7 @@ import pickle
 
 class SBC_FITS_PLOTTER:
 
-	def __init__(self,iax,ax,PAR,FITS,bounds,path_to_sigmaRel_rootpath,quantilemode=True,Quantiles=[0,0.025,0.05,0.16,0.5,0.84,0.95,0.975,1],FS=18):
+	def __init__(self,iax,ax,PAR,FITS,bounds,path_to_sigmaRel_rootpath,quantilemode=True,Quantiles=[0,0.025,0.05,0.16,0.32,0.5,0.68,0.84,0.95,0.975,1],FS=18):
 		self.iax = iax
 		self.ax  = ax
 		true_par,par,dfpar,parlabel = PAR[:]
@@ -73,7 +73,7 @@ class SBC_FITS_PLOTTER:
 		QUANTILES = pd.DataFrame(data={q:[self.FITS[ISIM]['chains'][self.dfpar].quantile(q) for ISIM in self.FITS] for q in self.Quantiles})
 		return QUANTILES
 
-	def plot_sbc_panel(self,Ncred=True,Parcred=False,annotate_true=True,real_data_samps=False,plot_ind=True,plot_true=True,plot_medians=True,include_pmedian=True,dress_figure=True,fill_between=True,color='C0',linestyle='-',Lside=False,FAC=None,XGRID=None,line_sap_title=None,line_rec_title=None):
+	def plot_sbc_panel(self,Ncred=True,Parcred=False,sap=None,annotate_true=True,real_data_samps=False,plot_ind=True,plot_true=True,plot_medians=True,include_pmedian=True,dress_figure=True,fill_between=True,color='C0',linestyle='-',Lside=False,FAC=None,XGRID=None,line_sap_title=None,line_rec_title=None):
 		"""
 		Plot SBC Panel
 
@@ -85,6 +85,9 @@ class SBC_FITS_PLOTTER:
 			if True, plot N68, N95
 		Parcred : bool (optional; default=False)
 			if True, plot 68 and 95 quantiles of parameter
+		sap : None or int (optional; default=None)
+			if None, summarise using normal singly peaked Gaussian like posterior;
+			otherwise, summarise as peaking at lower or upper prior boundary, indicated by sap = 0 or 1, respectively
 		annotate_true : bool (optional; default=True)
 			if True, plot 'True par = value'
 		real_data_samps : array (optional; default is None)
@@ -108,7 +111,7 @@ class SBC_FITS_PLOTTER:
 		Lside : bool (optional; default=False)
 			if True, put annotations on LHS of panel
 		FAC : float (optional; default=None)
-			factor to reduce KDE grid for simulation-averaed posterior by compared to No.of samples
+			factor to reduce KDE grid for simulation-averaged posterior by compared to No.of samples
 		XGRID : list (optional; default=None)
 			[xmin,xmax,Nsteps] for .xgrid
 		line_sap_title : str (optional; default=None)
@@ -147,6 +150,48 @@ class SBC_FITS_PLOTTER:
 		lims      = {loop_par:[SAMPS.min().min(),SAMPS.max().max()]}
 		self.lims   = lims
 		#self.bounds = bounds
+		roundint = 2 if loop_par not in ['sigmaRel','sigmaCommon'] else 3
+		if sap is not None:
+			Ncred=False;Parcred=True
+			assert(sap in [0,1])
+			x68 = {0:0.68,1:0.32}[sap]
+			x95 = {0:0.95,1:0.05}[sap]
+
+		###Plot and Simulation Averaged Posterior
+		samps = PARAMETER(SAMPS.stack(),dfpar,parlabel,lims[loop_par],self.bounds[loop_par],None,iax,{},XGRID=XGRID)
+		sap_chain = samps.chain
+		#Plot and label
+		if XGRID is None:
+			if FAC is None:	samps.Nsamps /= 10
+			else:			samps.Nsamps /= FAC
+		samps.get_xgrid_KDE()
+		if line_sap_title is None: line_sap_title = 'Simulation-Averaged Posterior'
+		if sap is None:
+			if self.quantilemode:	line_sap_summary = r'$%s = %s ^{+%s}_{-%s}$'%(parlabel,sap_chain.quantile(0.5).round(roundint),round(sap_chain.quantile(0.84)-sap_chain.quantile(0.5),roundint),round(sap_chain.quantile(0.5)-sap_chain.quantile(0.16),roundint))
+			else:					line_sap_summary = r'$%s = %s \pm %s$'%(parlabel,sap_chain.quantile(0.5).round(roundint),sap_chain.std().round(roundint))
+		else:
+			lg = {0:'<',1:'>'}[sap]
+			line_sap_summary = r'$%s %s %s (%s)$'%(parlabel,lg,sap_chain.quantile(x68).round(roundint),sap_chain.quantile(x95).round(roundint))
+		print (line_sap_title+line_sap_summary)
+		ax[iax].plot(samps.xgrid,samps.KDE,alpha=1,color=color,linewidth=3,label='\n'.join([line_sap_title,line_sap_summary]),linestyle=linestyle)
+		#Fill between with quantiles
+		simavheight = samps.KDE[np.argmin(np.abs(sap_chain.quantile(0.5)-samps.xgrid))]
+		if fill_between:
+			if sap is None:
+				for qlo,qhi in zip([0.16,0.025],[0.84,0.975]):
+					siglo = samps.get_KDE_values(value=sap_chain.quantile(qlo), return_only_index=True)
+					sigup = samps.get_KDE_values(value=sap_chain.quantile(qhi), return_only_index=True)+1
+					ax[iax].fill_between(samps.xgrid[siglo:sigup],np.zeros(sigup-siglo),samps.KDE[siglo:sigup],color=color,alpha=0.2)
+				ax[iax].plot(sap_chain.quantile(0.5)*np.ones(2),[0,simavheight],c=color,linewidth=2,linestyle=linestyle)
+			elif sap in [0,1]:
+				for qlo,qhi in zip([sap,sap],[x68,x95]):
+					if sap==1: qlo,qhi = qhi,qlo
+					siglo = samps.get_KDE_values(value=sap_chain.quantile(qlo), return_only_index=True)
+					sigup = samps.get_KDE_values(value=sap_chain.quantile(qhi), return_only_index=True)+1
+					ax[iax].fill_between(samps.xgrid[siglo:sigup],np.zeros(sigup-siglo),samps.KDE[siglo:sigup],color=color,alpha=0.2)
+					ax[iax].plot(sap_chain.quantile(x68)*np.ones(2),[0,samps.KDE[np.argmin(np.abs(sap_chain.quantile(x68)-samps.xgrid))]],c=color,linewidth=2,linestyle=linestyle)
+					ax[iax].plot(sap_chain.quantile(x95)*np.ones(2),[0,samps.KDE[np.argmin(np.abs(sap_chain.quantile(x95)-samps.xgrid))]],c=color,linewidth=2,linestyle=linestyle)
+
 
 		#Plot N68, N95
 		N68   = (SAMPS.quantile(0.16) <= true_par) & (true_par < SAMPS.quantile(0.84)) ; N95   = (SAMPS.quantile(0.025) <= true_par) & (true_par < SAMPS.quantile(0.975))
@@ -156,22 +201,24 @@ class SBC_FITS_PLOTTER:
 			line68 = r'$N_{68} = %s$'%round(100*(N68/SAMPS.shape[1]),1)+'%' 						 ;
 			line95 = r'$N_{95} = %s$'%round(100*(N95/SAMPS.shape[1]),1)+'%'
 		elif Parcred:
-			line68 = r'$%s;\,68}=%s ^{+%s}_{-%s}$'%(parlabel[:-1]#.split('}')[0]
-														,SAMPS.quantile(0.68).median().round(2), round(SAMPS.quantile(0.68).quantile(0.84)-SAMPS.quantile(0.68).quantile(0.5),2),round(SAMPS.quantile(0.68).quantile(0.5)-SAMPS.quantile(0.68).quantile(0.16),2))
-			line95 = r'$%s;\,95}=%s ^{+%s}_{-%s}$'%(parlabel[:-1]#.split('}')[0]
-														,SAMPS.quantile(0.95).median().round(2), round(SAMPS.quantile(0.95).quantile(0.84)-SAMPS.quantile(0.95).quantile(0.5),2),round(SAMPS.quantile(0.95).quantile(0.5)-SAMPS.quantile(0.95).quantile(0.16),2))
+			ll68= ';\,%s}'%str(int(100*x68)) if parlabel[-1]=='}' else '_{%s}'%str(int(100*x68)) ; ll95= ';\,%s}'%str(int(100*x95)) if parlabel[-1]=='}' else '_{%s}'%str(int(100*x95))
+			line68 = r'$%s%s=%s ^{+%s}_{-%s}$'%(parlabel[:-1] if parlabel[-1]=='}'  else parlabel,ll68
+														,SAMPS.quantile(x68).median().round(roundint), round(SAMPS.quantile(x68).quantile(0.84)-SAMPS.quantile(x68).quantile(0.5),roundint),round(SAMPS.quantile(x68).quantile(0.5)-SAMPS.quantile(x68).quantile(0.16),roundint))
+			line95 = r'$%s%s=%s ^{+%s}_{-%s}$'%(parlabel[:-1] if parlabel[-1]=='}'  else parlabel,ll95
+														,SAMPS.quantile(x95).median().round(roundint), round(SAMPS.quantile(x95).quantile(0.84)-SAMPS.quantile(x95).quantile(0.5),roundint),round(SAMPS.quantile(x95).quantile(0.5)-SAMPS.quantile(x95).quantile(0.16),roundint))
 		else:
 			line68,line95='',''
 		print (line68+line95)
-		ax[iax].annotate(line68,xy=(0.95-(0.95-0.0225)*Lside,0.425-0.08*Parcred),xycoords='axes fraction',fontsize=FS,ha=HA)
-		ax[iax].annotate(line95,xy=(0.95-(0.95-0.0225)*Lside,0.375-Parcred*(0.13-0.025*(iax==0))),xycoords='axes fraction',fontsize=FS,ha=HA)
+		if sap is None:
+			ax[iax].annotate(line68,xy=(0.95-(0.95-0.05)*Lside,0.425),xycoords='axes fraction',fontsize=FS,ha=HA)
+			ax[iax].annotate(line95,xy=(0.95-(0.95-0.05)*Lside,0.375-Parcred*(0.025)),xycoords='axes fraction',fontsize=FS,ha=HA)
 
 		#Real-Data Posterior Fit
 		if real_data_samps is not False:
 			if line_rec_title is None: line_rec_title   = 'Real-Data Posterior'
 			samps = PARAMETER(real_data_samps,dfpar,parlabel,lims[loop_par],bounds[loop_par],-1,iax,{},XGRID=XGRID)
 			samps.get_xgrid_KDE()
-			ax[iax].plot(samps.xgrid,samps.KDE,alpha=1,linewidth=3,color='C3',label=f"{line_rec_title} \n"+r'$%s = %s ^{+%s}_{-%s}$'%(parlabel,real_data_samps.quantile(0.5).round(2),round(real_data_samps.quantile(0.84)-real_data_samps.quantile(0.5),2),round(real_data_samps.quantile(0.5)-real_data_samps.quantile(0.16),2)))
+			ax[iax].plot(samps.xgrid,samps.KDE,alpha=1,linewidth=3,color='C3',label=f"{line_rec_title} \n"+r'$%s = %s ^{+%s}_{-%s}$'%(parlabel,real_data_samps.quantile(0.5).round(roundint),round(real_data_samps.quantile(0.84)-real_data_samps.quantile(0.5),2),round(real_data_samps.quantile(0.5)-real_data_samps.quantile(0.16),2)))
 			simavheight = samps.KDE[np.argmin(np.abs(real_data_samps.quantile(0.5)-samps.xgrid))]
 			ax[iax].plot(real_data_samps.quantile(0.5)*np.ones(2),[0,simavheight],c='C3',linewidth=2)
 
@@ -186,49 +233,46 @@ class SBC_FITS_PLOTTER:
 
 		#Plot True Parameter Value, and Annotate
 		if plot_true is True:
-			ax[iax].plot(true_par*np.ones(2),[0,KDEmax],c='black',linewidth=2,linestyle='--')
+			ax[iax].plot(true_par*np.ones(2),[0,KDEmax],c='black',linewidth=5,linestyle='--')
 		if annotate_true:
-			ax[iax].annotate(r'True $%s=%s$'%(parlabel,true_par),xy=(0.95-(0.95-0.0225)*Lside,0.5+0.02),xycoords='axes fraction',fontsize=FS,ha='left' if ('tau' in loop_par and iax>0) else 'right')
-
-
-		###Plot and Simulation Averaged Posterior
-		samps = PARAMETER(SAMPS.stack(),dfpar,parlabel,lims[loop_par],self.bounds[loop_par],None,iax,{},XGRID=XGRID)
-		sap_chain = samps.chain
-		#Plot and label
-		if XGRID is None:
-			if FAC is None:	samps.Nsamps /= 10
-			else:			samps.Nsamps /= FAC
-		samps.get_xgrid_KDE()
-		if line_sap_title is None: line_sap_title = 'Simulation-Averaged Posterior'
-		if self.quantilemode:	line_sap_summary = r'$%s = %s ^{+%s}_{-%s}$'%(parlabel,sap_chain.quantile(0.5).round(2),round(sap_chain.quantile(0.84)-sap_chain.quantile(0.5),2),round(sap_chain.quantile(0.5)-sap_chain.quantile(0.16),2))
-		else:					line_sap_summary = r'$%s = %s \pm %s$'%(parlabel,sap_chain.quantile(0.5).round(2),sap_chain.std().round(2))
-		print (line_sap_title+line_sap_summary)
-		ax[iax].plot(samps.xgrid,samps.KDE,alpha=1,color=color,linewidth=3,label='\n'.join([line_sap_title,line_sap_summary]),linestyle=linestyle)
-		#Fill between with quantiles
-		if fill_between:
-			for qlo,qhi in zip([0.16,0.025],[0.84,0.975]):
-				siglo = samps.get_KDE_values(value=sap_chain.quantile(qlo), return_only_index=True)
-				sigup = samps.get_KDE_values(value=sap_chain.quantile(qhi), return_only_index=True)+1
-				ax[iax].fill_between(samps.xgrid[siglo:sigup],np.zeros(sigup-siglo),samps.KDE[siglo:sigup],color=color,alpha=0.2)
-			simavheight = samps.KDE[np.argmin(np.abs(sap_chain.quantile(0.5)-samps.xgrid))]
-			ax[iax].plot(sap_chain.quantile(0.5)*np.ones(2),[0,simavheight],c=color,linewidth=2,linestyle=linestyle)
+			ax[iax].annotate(r'True $%s=%s$'%(parlabel,true_par),xy=(0.95-(0.95-0.05)*Lside,0.5+0.02),xycoords='axes fraction',fontsize=FS,ha='right' if not Lside else 'left',bbox=dict(facecolor='white',alpha=0.5, edgecolor='black', boxstyle='round,pad=0.3'))
 
 		#Plot and Annotate Medians
 		if plot_medians:
-			if self.quantilemode:	line_median  = r'Median-$%s=%s^{+%s}_{-%s}$'%(parlabel,QUANTILES[0.5].quantile(0.5).round(2),round(QUANTILES[0.5].quantile(0.84)-QUANTILES[0.5].quantile(0.5),2),round(QUANTILES[0.5].quantile(0.5)-QUANTILES[0.5].quantile(0.16),2))
-			else:					line_median  = r'Median-$%s=%s\pm%s$'%(parlabel,QUANTILES[0.5].quantile(0.5).round(2),QUANTILES[0.5].std().round(2))
-			line_pmedian = r"$p($"+'Median-'+r"$%s<%s ; \,\rm{True}})=%s$"%(parlabel, parlabel[:-1]#.split('}')[0]
-																							,round(100*QUANTILES[QUANTILES[0.5]<true_par].shape[0]/QUANTILES[0.5].shape[0],1)) + '%'
-			if not include_pmedian:	median_labels = line_median
-			else:					median_labels = '\n'.join([line_median,line_pmedian])
-			ax[iax].plot(QUANTILES[0.5].quantile(0.5)*np.ones(2),[0,KDEmax],c='C1'	,linewidth=2,label=median_labels,linestyle=':')
-			ax[iax].fill_between([QUANTILES[0.5].quantile(0.16),QUANTILES[0.5].quantile(0.84)],[0,0],[KDEmax,KDEmax],color='C1',alpha=0.2)
-			print (line_median+line_pmedian)
+			if sap is None:
+				if self.quantilemode:	line_median  = r'Median-$%s=%s^{+%s}_{-%s}$'%(parlabel,QUANTILES[0.5].quantile(0.5).round(roundint),round(QUANTILES[0.5].quantile(0.84)-QUANTILES[0.5].quantile(0.5),roundint),round(QUANTILES[0.5].quantile(0.5)-QUANTILES[0.5].quantile(0.16),roundint))
+				else:					line_median  = r'Median-$%s=%s\pm%s$'%(parlabel,QUANTILES[0.5].quantile(0.5).round(roundint),QUANTILES[0.5].std().round(roundint))
+
+				if parlabel[-1]=='}':
+					line_pmedian = r"$p($"+'Median-'+r"$%s<%s ; \,\rm{True}})=%s$"% \
+						(parlabel, parlabel[:-1],round(100*QUANTILES[QUANTILES[0.5]<true_par].shape[0]/QUANTILES[0.5].shape[0],1)) + '%'
+				else:
+					line_pmedian = r"$p($"+'Median-'+r"$%s<%s_{\rm{True}})=%s$"% \
+						(parlabel, parlabel,round(100*QUANTILES[QUANTILES[0.5]<true_par].shape[0]/QUANTILES[0.5].shape[0],1)) + '%'
+				if not include_pmedian:	median_labels = line_median
+				else:					median_labels = '\n'.join([line_median,line_pmedian])
+				ax[iax].plot(QUANTILES[0.5].quantile(0.5)*np.ones(2),[0,KDEmax],c='C1'	,linewidth=2,label=median_labels,linestyle=':')
+				ax[iax].fill_between([QUANTILES[0.5].quantile(0.16),QUANTILES[0.5].quantile(0.84)],[0,0],[KDEmax,KDEmax],color='C1',alpha=0.2)
+				print (line_median+line_pmedian)
+
+			elif sap in [0,1]:
+				ax[iax].plot(SAMPS.quantile(x68).quantile(0.5)*np.ones(2),[0,KDEmax],c='C2'	,linewidth=2,linestyle=':',label=line68)#,label=median_labels)
+				ax[iax].fill_between([SAMPS.quantile(x68).quantile(0.16),SAMPS.quantile(x68).quantile(0.84)],[0,0],[KDEmax,KDEmax],color='C2',alpha=0.2)
+
+				ax[iax].plot(SAMPS.quantile(x95).quantile(0.5)*np.ones(2),[0,KDEmax],c='C6'	,linewidth=2,linestyle=':',label=line95)#,label=median_labels)
+				ax[iax].fill_between([SAMPS.quantile(x95).quantile(0.16),SAMPS.quantile(x95).quantile(0.84)],[0,0],[KDEmax,KDEmax],color='C6',alpha=0.2)
+
+				XR = ax[iax].get_xlim()
+				XR = XR[1]-XR[0]
+				X68 = str(int(x68*100))+'%'; X95 = str(int(x95*100))+'%'; HA = {0:'left',1:'right'}[sap]
+				ax[iax].annotate(X68,xy=(SAMPS.quantile(x68).quantile(0.5)+((-1)**sap)*XR*0.01,KDEmax*0.4),fontsize=FS,ha=HA,weight='bold',color='C2')
+				ax[iax].annotate(X95,xy=(SAMPS.quantile(x95).quantile(0.5)+((-1)**sap)*XR*0.01,KDEmax*0.4),fontsize=FS,ha=HA,weight='bold',color='C6')
+
 		#Set ticks and legend
 		if dress_figure:
 			ax[iax].set_ylim([0,max(KDEmax,simavheight)])
 			ax[iax].set_yticks([])
-			ax[iax].legend(fontsize=FS,framealpha=1,loc='upper right')
+			ax[iax].legend(fontsize=FS-1*('com_rat' in loop_par and sap is None),framealpha=1,loc='upper right')
 			ax[iax].tick_params(labelsize=FS)
 
 		#Set appropriate limits
