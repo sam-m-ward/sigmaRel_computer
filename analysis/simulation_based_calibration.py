@@ -44,7 +44,7 @@ if ALT_PRIOR == False:	hyperprior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho 
 if ALT_PRIOR == 'C': 	hyperprior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]
 
 #Perform SBC
-Summary_Strs = []; GLOB_FITS = {} ; productpath = None; plotpath = None; modelkey  = None; sim_sigma0 = None
+productpath = None; plotpath = None; modelkey  = None; sim_sigma0 = None
 for rs in np.arange(RS):
 	for sigR,RHO in zip([0,0.1/((2)**0.5),0.1],[1,0.5,0]):
 		try:
@@ -96,6 +96,7 @@ vals = {'rho':[1,0.5,0],
 df_vals = pd.DataFrame(vals)
 
 #Collate Results
+GLOB_FITS = {}
 for sigR,RHO in zip(df_vals.sigmaRel.values,df_vals.rho.values):
 	FITS = {}
 	for ISIM in np.arange(RS):
@@ -110,35 +111,52 @@ for sigR,RHO in zip(df_vals.sigmaRel.values,df_vals.rho.values):
 	GLOB_FITS[RHO] = FITS
 
 #Plot SBC
+pars = ['rho','sigmaRel','sigmaCommon','sigma0']
+pars = ['rho','rel_rat','com_rat']
+
+GFITS = {key:value for key,value in GLOB_FITS.items() if key in [1,0]}
+fig,axs = pl.subplots(len(GFITS),len(pars),figsize=(8*len(pars),6*len(GFITS)),sharex=False)
+counter=-1
+for row,true_rho in enumerate(GFITS):
+	for col,par in enumerate(pars):
+		counter+=1
+		FITS      = GFITS[true_rho]
+		sap,Ncred = get_sap_Ncred(par,true_rho,ALT_PRIOR)
+		true_par  = round(df_vals[df_vals.rho==true_rho][par].values[0],3)
+		plotter   = SBC_FITS_PLOTTER(counter,fig.axes,[true_par,par,dfpars[par],parlabels[par]],FITS,bounds,rootpath,quantilemode=args['quantilemode'])
+		plotter.plot_sbc_panel(sap=sap,Ncred=False,Lside=True if sap==1 else False,
+										annotate_true=True,plot_ind=False,plot_true=True,plot_medians=False,dress_figure=True,
+										fill_between=False,color=f"C0",linestyle='-',FAC=100,line_sap_title='')#'Sim. Posterior')
+		if row==len(GFITS)-1:
+			fig.axes[counter].set_xlabel(r'%s'%parlabels_full[par],fontsize=plotter.FS+2)
+for iax in range(int(len(GFITS)*len(pars))):
+	new_xlabels = [x if float(x.get_text()) not in [0,0.1,1] else {0:'0',0.1:'0.1',1:'1'}[float(x.get_text())] for x in fig.axes[iax].get_xticklabels()]
+	fig.axes[iax].set_xticklabels(new_xlabels)
+	pass
+
+fig.axes[0].set_ylabel('Posterior Densities',fontsize=plotter.FS+2,color='white')#For spacing
+fig.text(0.1, 0.5, 'Posterior Densities', ha='center', va='center', rotation='vertical',fontsize=plotter.FS)
+fig.subplots_adjust(wspace=0.08,hspace=0.08)
+if args['save']:
+	pl.savefig(f"{plotpath}SBC_{'.'.join(pars)}.pdf",bbox_inches='tight')
+if args['show']:
+	pl.show()
+err=1/0
+
+
 fig,axs = pl.subplots(len(GLOB_FITS),1,figsize=(8,6*len(GLOB_FITS)),sharex=False)
 for iax,true_rho in enumerate(GLOB_FITS):
-	FITS     = GLOB_FITS[true_rho]
-	###GET SAP KEY##############################################
-	sap = None
-	if loop_par=='rho':
-		sap      = true_rho if true_rho in [0,1] else None
-	if (ALT_PRIOR is False) and ((true_rho==1 and loop_par in ['sigmaRel','rel_rat','rel_rat2']) or (true_rho==0 and loop_par in ['sigmaCommon','com_rat','com_rat2'])):
-			sap=0
-	if (true_rho==0 and loop_par in ['rel_rat','rel_rat2']) or (true_rho==1 and loop_par in ['com_rat','com_rat2']):
-			sap=1
-	###GET NCRED
-	Ncred = False if (sap is None and true_rho!=0.5 and (  (loop_par not in ['sigma0','sigmaRel','sigmaCommon'] and ALT_PRIOR is False) \
-														or (loop_par not in ['sigma0'] and ALT_PRIOR is not False)))  else True
-	if ALT_PRIOR is not False:
-		if (true_rho==0 and loop_par in ['sigmaRel']) or (true_rho==1 and loop_par in ['sigmaCommon']):
-			Ncred = True
-	############################################################
-	true_par = round(df_vals[df_vals.rho==true_rho][loop_par].values[0],3)
-	plotter  = SBC_FITS_PLOTTER(iax,fig.axes,[true_par,loop_par,dfpars[loop_par],parlabels[loop_par]],FITS,bounds,rootpath,quantilemode=args['quantilemode'])
-	plotter.plot_sbc_panel(sap=sap, Lside = True if ('_rat' in loop_par and true_rho==0.5) else False,
-									Ncred = Ncred,FAC = 25)
+	FITS      = GLOB_FITS[true_rho]
+	sap,Ncred = get_sap_Ncred(loop_par,true_rho,ALT_PRIOR)
+	true_par  = round(df_vals[df_vals.rho==true_rho][loop_par].values[0],3)
+	plotter   = SBC_FITS_PLOTTER(iax,fig.axes,[true_par,loop_par,dfpars[loop_par],parlabels[loop_par]],FITS,bounds,rootpath,quantilemode=args['quantilemode'])
+	plotter.plot_sbc_panel(sap=sap, Ncred = Ncred, Lside = True if ('_rat' in loop_par and true_rho==0.5) else False,FAC = 25)
 fig.axes[0].set_title('Fits to %s$\\times$%s simulations of %s sibling-pair galaxies;\nTrue $\sigma_0 = %s\,$mag;\nHyperpriors: %s'%(df_vals.shape[0],Nsim_keep,Ng,sim_sigma0,' ; '.join(hyperprior_lines)),fontsize=plotter.FS)
 fig.axes[-1].set_xlabel(r'%s'%parlabels_full[loop_par],fontsize=plotter.FS)
 fig.axes[0].set_ylabel('Posterior Densities',fontsize=plotter.FS,color='white')#For spacing
 fig.text(0.01, 0.5, 'Posterior Densities', ha='center', va='center', rotation='vertical',fontsize=plotter.FS)
 pl.tight_layout()
-if args['save']:
-	#savekey   = f'multigalsims_{samplename}_Modelsigma0{sigma0}'
+if args['save']:#savekey   = f'multigalsims_{samplename}_Modelsigma0{sigma0}'
 	pl.savefig(f"{plotpath}SBC_looppar{loop_par}_quantilemode{args['quantilemode']}_hyperprior{ALT_PRIOR}.pdf",bbox_inches='tight')
 if args['show']:
 	pl.show()
