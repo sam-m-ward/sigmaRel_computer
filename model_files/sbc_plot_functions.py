@@ -16,6 +16,7 @@ SBC_FITS_PLOTTER class
 Functions are:
 	get_KEEPERS(GLOB_FITS,Nsim_keep,Rhat_threshold,loop_par,dfpar)
 	trim_to_KEEPERS(GLOB_FITS,KEEPERS)
+	get_sap_Ncred(loop_par,true_rho,ALT_PRIOR)
 
 --------------------
 
@@ -173,24 +174,28 @@ class SBC_FITS_PLOTTER:
 			lg = {0:'<',1:'>'}[sap]
 			line_sap_summary = r'$%s %s %s (%s)$'%(parlabel,lg,sap_chain.quantile(x68).round(roundint),sap_chain.quantile(x95).round(roundint))
 		print (line_sap_title+line_sap_summary)
-		ax[iax].plot(samps.xgrid,samps.KDE,alpha=1,color=color,linewidth=3,label='\n'.join([line_sap_title,line_sap_summary]),linestyle=linestyle)
-		#Fill between with quantiles
+		ax[iax].plot(samps.xgrid,samps.KDE,alpha=1,color=color,linewidth=3,label='\n'.join([line_sap_title,line_sap_summary]) if line_sap_title is not '' else line_sap_summary,linestyle=linestyle)
+		KDEmax      = np.amax(samps.KDE)
 		simavheight = samps.KDE[np.argmin(np.abs(sap_chain.quantile(0.5)-samps.xgrid))]
+		if sap in [0,1]:
+			ax[iax].plot(sap_chain.quantile(x68)*np.ones(2),[0,samps.KDE[np.argmin(np.abs(sap_chain.quantile(x68)-samps.xgrid))]],c=color,linewidth=2,linestyle=linestyle)
+			ax[iax].plot(sap_chain.quantile(x95)*np.ones(2),[0,samps.KDE[np.argmin(np.abs(sap_chain.quantile(x95)-samps.xgrid))]],c=color,linewidth=2,linestyle=linestyle)
+		elif sap is None:
+			ax[iax].plot(sap_chain.quantile(0.5)*np.ones(2),[0,simavheight],c=color,linewidth=2,linestyle=linestyle)
+		#Fill between with quantiles
 		if fill_between:
 			if sap is None:
 				for qlo,qhi in zip([0.16,0.025],[0.84,0.975]):
 					siglo = samps.get_KDE_values(value=sap_chain.quantile(qlo), return_only_index=True)
 					sigup = samps.get_KDE_values(value=sap_chain.quantile(qhi), return_only_index=True)+1
 					ax[iax].fill_between(samps.xgrid[siglo:sigup],np.zeros(sigup-siglo),samps.KDE[siglo:sigup],color=color,alpha=0.2)
-				ax[iax].plot(sap_chain.quantile(0.5)*np.ones(2),[0,simavheight],c=color,linewidth=2,linestyle=linestyle)
 			elif sap in [0,1]:
 				for qlo,qhi in zip([sap,sap],[x68,x95]):
 					if sap==1: qlo,qhi = qhi,qlo
 					siglo = samps.get_KDE_values(value=sap_chain.quantile(qlo), return_only_index=True)
 					sigup = samps.get_KDE_values(value=sap_chain.quantile(qhi), return_only_index=True)+1
 					ax[iax].fill_between(samps.xgrid[siglo:sigup],np.zeros(sigup-siglo),samps.KDE[siglo:sigup],color=color,alpha=0.2)
-					ax[iax].plot(sap_chain.quantile(x68)*np.ones(2),[0,samps.KDE[np.argmin(np.abs(sap_chain.quantile(x68)-samps.xgrid))]],c=color,linewidth=2,linestyle=linestyle)
-					ax[iax].plot(sap_chain.quantile(x95)*np.ones(2),[0,samps.KDE[np.argmin(np.abs(sap_chain.quantile(x95)-samps.xgrid))]],c=color,linewidth=2,linestyle=linestyle)
+
 
 
 		#Plot N68, N95
@@ -351,3 +356,41 @@ def trim_to_KEEPERS(GLOB_FITS,KEEPERS):
 	for key in GLOB_FITS:
 		GLOB_FITS[key] = {ISIM:GLOB_FITS[key][ISIM] for ISIM in KEEPERS}
 	return GLOB_FITS
+
+def get_sap_Ncred(loop_par,true_rho,ALT_PRIOR):
+	"""
+	Get Simulation-Averaged-Posterior-Summary-Style (sap) and Ncred (whether to include no. of sims in 68/95% intervals)
+
+	Parameters
+	----------
+	loop_par : string
+		parameter name that is being plotted
+
+	true_rho : float
+		true value of rho in simulation
+
+	ALT_PRIOR : string or bool
+		defines hyperprior used in fit
+
+	Returns
+	----------
+	sap : None or 0 or 1
+		if None, used Gaussian peak posterior; if 0 peaks at lower bound, if 1 peaks at upper bound
+
+	Ncred : bool
+		if False don't include N68,N95 summaries, if True, do include them.
+	"""
+	sap = None
+	if loop_par=='rho':
+		sap      = true_rho if true_rho in [0,1] else None
+	if (ALT_PRIOR is False) and ((true_rho==1 and loop_par in ['sigmaRel','rel_rat','rel_rat2']) or (true_rho==0 and loop_par in ['sigmaCommon','com_rat','com_rat2'])):
+			sap=0
+	if (true_rho==0 and loop_par in ['rel_rat','rel_rat2']) or (true_rho==1 and loop_par in ['com_rat','com_rat2']):
+			sap=1
+	###GET NCRED
+	Ncred = False if (sap is None and true_rho!=0.5 and (  (loop_par not in ['sigma0','sigmaRel','sigmaCommon'] and ALT_PRIOR is False) \
+														or (loop_par not in ['sigma0'] and ALT_PRIOR is not False)))  else True
+	if ALT_PRIOR is not False:
+		if (true_rho==0 and loop_par in ['sigmaRel']) or (true_rho==1 and loop_par in ['sigmaCommon']):
+			Ncred = True
+	return sap,Ncred
