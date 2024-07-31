@@ -211,8 +211,8 @@ def load_dfmus(chains_file='ZTFtest5',rootpath='../', tau=0.252):
     #########################
 
     #FINAL TOUCHES
-    print ('Setting measurement errors on zcmb/zHD to be same as on zhelio; thus assuming errors are perfectly correlated and no additional errors in CMB or flow corrections')
-    print ('This is fine for cmb, but unclear how flow correction would change with strong changes in zhelio(or equivalently zcmb)')
+    print ('Setting measurement errors on zcmb/zHD to be same as on zhelio, i.e. the sigmaz term used in mu-pipeline cosmo-distance errors; thus assuming errors are perfectly correlated and no additional errors in CMB or flow corrections')
+    print ('This is fine for zcmb, but unclear how flow correction would change with strong changes in zhelio(or equivalently zcmb)')
     dfmus['zcmb_errs'] = dfmus['zhelio_errs'].copy()#Keep things simple seeing as these columns are essentially identical
     dfmus['zHD_errs']  = dfmus['zhelio_errs'].copy()#Keep things simple seeing as these columns are essentially identical
     dfmus.reset_index(inplace=True)#Move SN to columns
