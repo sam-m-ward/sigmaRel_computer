@@ -165,6 +165,7 @@ class ModelLoader:
 				modelkey += f"_alphazhelio"
 		if self.alt_prior:
 			print (f"Using Alternative Prior"+str(self.alt_prior)*(self.alt_prior!=True))
+			if self.alt_prior=='p': print (f'p={self.choices.p}; usamp_input={self.choices.usamp_input}')
 			modelkey += f"_altprior"
 			if self.alt_prior!=True:
 				modelkey+= f'{self.alt_prior}'
@@ -296,6 +297,9 @@ class ModelLoader:
 			stan_data['sigma0']    = self.sigma0
 		if self.sigmapec!='free':
 			stan_data['pec_unity'] = self.sigmapec*1e3/self.choices.c_light
+		if self.alt_prior=='p':
+			stan_data['p']           = self.choices.p
+			stan_data['usamp_input'] = self.choices.usamp_input
 
 		return stan_data
 
