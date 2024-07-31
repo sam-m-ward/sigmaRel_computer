@@ -782,7 +782,11 @@ class PARAMETER:
 					if blind:
 						summarystr = parlabel.split(' (')[0] + f" {lg} 0.X (0.X)"
 					else:
-						if 'sigma' in parlabel and 'sigma' in parname:	summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.3f} ({storeinfo[0.95]:.3f})"
+						if 'sigma' in parlabel and 'sigma' in parname:
+							if parname=='sigmapec':
+								summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.0f} ({storeinfo[0.95]:.0f})"
+							else:
+								summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.3f} ({storeinfo[0.95]:.3f})"
 						else:					summarystr = parlabel.split(' (')[0] + f" {lg} {storeinfo[0.68]:.2f} ({storeinfo[0.95]:.2f})"
 					if not multiplot:	ax[xrow,row].set_title(summarystr, fontsize=FS)
 					else:
