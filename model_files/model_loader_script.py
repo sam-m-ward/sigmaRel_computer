@@ -253,7 +253,7 @@ class ModelLoader:
 		print ('###'*30)
 		print (f"Beginning Stan fit: {self.modelkey}")
 		#Groupby galaxy to count Nsibs per galaxy
-		Gal   = dfmus.groupby('Galaxy',sort=False)[[f'muext_{self.zcosmo}_hats',f'{self.zcosmo}_hats',f'{self.zcosmo}_errs','zhelio_hats']].agg('mean')
+		Gal   = dfmus.groupby('Galaxy',sort=False)[[f'muext_{self.zcosmo}_hats',f'{self.zcosmo}_hats',f'{self.zcosmo}_errs']].agg('mean')
 		Ng    = Gal.shape[0]
 		S_g   = dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
 		Nsibs = int(sum(S_g))
@@ -263,7 +263,7 @@ class ModelLoader:
 		mu_sib_phots     = dfmus['mus'].values
 		mu_sib_phot_errs = dfmus['mu_errs'].values
 		#External Distances
-		mu_ext_gal, zcosmos, zcosmoerrs, zhelios = [Gal[col].tolist() for col in Gal.columns]
+		mu_ext_gal, zcosmos, zcosmoerrs = [Gal[col].tolist() for col in Gal.columns]
 
 		def etamapper(x): return 0 if x is None else x
 		#Load up data
@@ -271,9 +271,9 @@ class ModelLoader:
 							 [ Ng , S_g , Nsibs , mu_sib_phots , mu_sib_phot_errs , mu_ext_gal , zcosmos , zcosmoerrs , self.sigmaRel_input , etamapper(self.eta_sigmaRel_input) ]))
 		if not self.use_external_distances or self.zmarg:
 			stan_data = {key:value for key,value in stan_data.items() if key not in ['mu_ext_gal','zcosmos','zcosmoerrs']}
-		#if self.alt_prior:
-		#	stan_data = {key:value for key,value in stan_data.items() if key not in ['sigmaRel_input','eta_sigmaRel_input']}
-		if self.zmarg:#stan_data['zg_data']     = zcmbs#stan_data['zgerrs_data'] = zcmberrs#stan_data['zg_data']     = [np.array([zh,zc]) for zh,zc in zip(zcmbs, zhelios)]#stan_data['zgerrs_data'] = [np.ones((2,2))*ze for ze in zcmberrs]#Assume measurements errors on zcmb and zhelio are the same, and they are perfectly correlated
+
+		if self.zmarg:
+			zhelios = dfmus.groupby('Galaxy',sort=False)['zhelio_hats'].agg('mean').tolist()
 			stan_data['zhelio_hats'] = zhelios
 			stan_data['zpo_hats']    = np.asarray(zhelios)-np.asarray(zcosmos)
 			stan_data['zhelio_errs'] = zcosmoerrs#Assume measurements errors on zcosmo and zhelio are the same, and they are perfectly correlated
