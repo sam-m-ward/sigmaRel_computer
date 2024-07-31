@@ -545,14 +545,17 @@ class multi_galaxy_siblings:
 		"""
 		#Added Parameters
 		added_pars = ['rel_rat','com_rat','rel_rat2','com_rat2']
-		df['rel_rat'] = df['sigmaRel']/df['sigma0']
-		df['com_rat'] = df['sigmaCommon']/df['sigma0']
-		df['rel_rat2'] = df['sigmaRel'].pow(2)/df['sigma0'].pow(2)
-		df['com_rat2'] = df['sigmaCommon'].pow(2)/df['sigma0'].pow(2)
-		#Appender
-		added_fitsummary = az.summary({x:np.array_split(df[x].values,self.n_chains) for x in added_pars})
-		for x in added_pars:
-			fitsummary.loc[x,'r_hat'] = added_fitsummary.loc[x]['r_hat']
+		try:
+			df['rel_rat'] = df['sigmaRel']/df['sigma0']
+			df['com_rat'] = df['sigmaCommon']/df['sigma0']
+			df['rel_rat2'] = df['sigmaRel'].pow(2)/df['sigma0'].pow(2)
+			df['com_rat2'] = df['sigmaCommon'].pow(2)/df['sigma0'].pow(2)
+			#Appender
+			added_fitsummary = az.summary({x:np.array_split(df[x].values,self.n_chains) for x in added_pars})
+			for x in added_pars:
+				fitsummary.loc[x,'r_hat'] = added_fitsummary.loc[x]['r_hat']
+		except Exception as e:
+			print (e)
 		return df, fitsummary
 
 	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False, fig_ax=None, **kwargs):
