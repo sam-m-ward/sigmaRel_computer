@@ -656,16 +656,18 @@ class PARAMETER:
 		if parname in ['rho','rel_rat','com_rat','rel_rat2','com_rat2']:#Check for strong bimodality in 1D KDE ('strong' assessed by step size in gradient)
 			step = int(0.1*len(xgrid))
 			dKDE = KDE[::step][1:] - KDE[::step][:-1]
-			crosses = [i for i,k1,k2 in zip(np.arange(len(dKDE)-1),dKDE[:-1],dKDE[1:]) if k1/k2<0]
+			KDE_extent = np.amax(KDE)-np.amin(KDE)
+			crosses = [i for i,k1,k2 in zip(np.arange(len(dKDE)-1),dKDE[:-1],dKDE[1:]) if k1/k2<0 and abs(k1-k2)/KDE_extent>0.01]#i.e. change is greater than 1%
 			#if len(crosses)>1:
 			Ncrosses = len(crosses)
 			condition3 = True
 			'''#Plot gradient change detector
 			pl.figure()
 			for i in crosses:pl.scatter(np.array([xgrid[::step][i],xgrid[::step][i+1]])++(xgrid[step]-xgrid[0]),[dKDE[i],dKDE[i+1]])
-			pl.plot(xgrid,KDE)
-			pl.plot(xgrid[::step][:-1]+(xgrid[step]-xgrid[0]),dKDE)
-			pl.plot(xgrid[:-1],KDE[1:]-KDE[:-1])
+			pl.plot(xgrid,KDE,label='KDE')
+			pl.plot(xgrid[::step][:-1]+(xgrid[step]-xgrid[0]),dKDE,label='smoothed dKDE')
+			pl.plot(xgrid[:-1],KDE[1:]-KDE[:-1],label='KDE[1:]-KDE[:-1]')
+			pl.legend()
 			pl.show()
 			#'''
 
@@ -851,7 +853,7 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=No
 	DX      = 0 + (len(ax)==1)*1.1
 	y0      = len(ax) if y0 is None else y0
 	if not oneD:
-		pl.annotate(r"sigmaRel_Computer",     xy=(0.975+0.075*(len(ax)<3)+DX,y0-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
+		pl.annotate(r"sigmaRel_computer",     xy=(0.975+0.075*(len(ax)<3)+DX,y0-0.025),xycoords='axes fraction',fontsize=20-2*(len(ax)<3),color='black',weight='bold',ha='right',fontname='Courier New')
 	if lines:
 		for counter,line in enumerate(Lines):#og fontsize=15
 			pl.annotate(line, xy=(1+DX,y0-0.35-delta_y*(counter-1)),xycoords='axes fraction',fontsize=15,color=colour,ha='right')#weight='bold'
