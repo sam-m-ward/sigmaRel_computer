@@ -70,10 +70,6 @@ for altprior in ALT_PRIORS:
 		GLOB_FITS[RHO] = FITS
 	ALL_FITS[altprior] = GLOB_FITS
 
-
-#if ALT_PRIOR == False:	hyperprior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim \rm{Arcsine}(0,1)$"]
-#if ALT_PRIOR == 'C': 	hyperprior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]
-
 #Plot SBC
 fig,axs = pl.subplots(len(RHOS),len(pars),figsize=(8*len(pars),6*len(RHOS)),sharex=False)
 for ip,altprior in enumerate(ALL_FITS):
@@ -87,8 +83,9 @@ for ip,altprior in enumerate(ALL_FITS):
 			true_par  = round(df_vals[df_vals.rho==true_rho][par].values[0],3)
 			plotter   = SBC_FITS_PLOTTER(counter,fig.axes,[true_par,par,dfpars[par],parlabels[par]],FITS,bounds,rootpath,quantilemode=args['quantilemode'])
 			plotter.plot_sbc_panel(sap=sap,Ncred=False,Lside=True if sap==1 else False,
+											#Parcred=True,
 											annotate_true=True,plot_ind=False,plot_true=True,plot_medians=False,dress_figure=False,
-											fill_between=False,color=f"C{ip}",linestyle='-',FAC=20,line_sap_title='')#'Sim. Posterior')
+											fill_between=False,color=f"C{ip}",linestyle='-',FAC=20,line_sap_title='')
 			if row==len(GFITS)-1:
 				fig.axes[counter].set_xlabel(r'%s'%parlabels_full[par],fontsize=plotter.FS+2)
 
@@ -96,19 +93,15 @@ for iax in range(int(len(RHOS)*len(pars))):
 	fig.axes[iax].set_yticks([])
 	fig.axes[iax].legend(fontsize=plotter.FS,framealpha=1,loc='upper right')
 	fig.axes[iax].tick_params(labelsize=plotter.FS)
-
 	y = fig.axes[iax].get_ylim()
 	fig.axes[iax].set_ylim([0,y[1]])
-
 	new_xlabels = [x if float(x.get_text()) not in [0,0.1,1] else {0:'0',0.1:'0.1',1:'1'}[float(x.get_text())] for x in fig.axes[iax].get_xticklabels()]
 	fig.axes[iax].set_xticklabels(new_xlabels)
-	#pass
 
 fig.axes[0].set_title('NA\nNA\nNA',fontsize=plotter.FS+4,color='white')#For spacing
 fig.text(0.5,0.99,'Simulation-Based Calibration; Hyperpriors:',fontsize=plotter.FS+4,ha='center', va='center',color='black',weight='bold')#For spacing
 fig.text(0.5,0.95,' ; '.join([r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim \rm{Arcsine}(0,1)$"]),fontsize=plotter.FS+4,ha='center', va='center',color='C0',weight='bold')#For spacing
 fig.text(0.5,0.91,' ; '.join([r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"]),fontsize=plotter.FS+4,ha='center', va='center',color='C1',weight='bold')#For spacing
-
 fig.axes[0].set_ylabel('Simulation-Averaged Posteriors',fontsize=plotter.FS+2,color='white')#For spacing
 fig.text(0.1, 0.5, 'Simulation-Averaged Posteriors', ha='center', va='center', rotation='vertical',fontsize=plotter.FS)
 fig.subplots_adjust(wspace=0.08,hspace=0.08)
