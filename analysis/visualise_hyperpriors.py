@@ -53,6 +53,40 @@ def sigR_plot():
 	pl.savefig(f'{rootpath}plots/hyperprior/sigmaRel.pdf',bbox_inches='tight')
 	#pl.show()
 
+def x_plot():
+	zipper  = list(zip(xs,[f'C{_}' for _ in range(len(rhos))],labs,objs))
+	pl.figure()#figsize=(8,6))
+	for x,color,label,obj in zipper:#Get legend label order correct
+		pl.plot(*get_step(x,Nb),color=color,label='\n'.join(label),**plotting_args)
+	for x,color,label,obj in zipper[::-1]:#Get plot overlay order correct
+		pl.plot(*get_step(x,Nb),color=color,label=None,**plotting_args)
+	pl.xlabel(r'$\sigma_{\rm{Rel}}/\sigma_0$ (mag)',fontsize=FS)
+	pl.ylabel(r'No. of Samples',fontsize=FS)
+	pl.legend(fontsize=FS,title='Hyperpriors',title_fontsize=FS)
+	pl.tick_params(labelsize=FS)
+	pl.xlim([0,1])
+	pl.ylim([0,25000])
+	pl.tight_layout()
+	pl.savefig(f'{rootpath}plots/hyperprior/x.pdf',bbox_inches='tight')
+	#pl.show()
+
+def y_plot():
+	zipper  = list(zip(ys,[f'C{_}' for _ in range(len(rhos))],labs,objs))
+	pl.figure()#figsize=(8,6))
+	for x,color,label,obj in zipper:#Get legend label order correct
+		pl.plot(*get_step(x,Nb),color=color,label='\n'.join(label),**plotting_args)
+	for x,color,label,obj in zipper[::-1]:#Get plot overlay order correct
+		pl.plot(*get_step(x,Nb),color=color,label=None,**plotting_args)
+	pl.xlabel(r'$\sigma_{\rm{Common}}/\sigma_0$ (mag)',fontsize=FS)
+	pl.ylabel(r'No. of Samples',fontsize=FS)
+	pl.legend(fontsize=FS,title='Hyperpriors',title_fontsize=FS)
+	pl.tick_params(labelsize=FS)
+	pl.xlim([0,1])
+	pl.ylim([0,25000])
+	pl.tight_layout()
+	pl.savefig(f'{rootpath}plots/hyperprior/y.pdf',bbox_inches='tight')
+	#pl.show()
+
 
 def sigC_plot():
 	zipper  = list(zip(sigCs,[f'C{_}' for _ in range(len(rhos))],labs))
@@ -106,6 +140,48 @@ def combined_plot():
 	pl.savefig(f'{rootpath}plots/hyperprior/hyperpriors.pdf',bbox_inches='tight')
 	#pl.show()
 
+def combined_plot2():
+	fig,axs = pl.subplots(2,3,figsize=(12,5))#,sharex='col')
+	ax = fig.axes
+	parlabs = [r'$\rho$',r'$\sigma_{\rm{Rel}}$ (mag)',r'$\sigma_{\rm{Common}}$ (mag)',r'$\sigma_{\rm{Rel}}/\sigma_0$',r'$\sigma_{\rm{Common}}/\sigma_0$']
+	for ii,par in enumerate(['rho','sigR','sigC','x','y']):
+		zipper  = list(zip(eval(f'{par}s'),[f'C{_}' for _ in range(len(rhos))],labs,objs))
+		iax = ii + 1*(ii>2)#skip bottom left
+		if ii==3:
+			ax[ii].axis('off')
+		for x,color,label,obj in zipper:#Get legend label order correct
+			ax[iax].plot(*get_step(x,Nb),color=color,label='\n'.join(label),**plotting_args)
+		for x,color,label,obj in zipper[::-1]:#Get plot overlay order correct
+			ax[iax].plot(*get_step(x,Nb),color=color,label=None,**plotting_args)
+
+		if par=='rho':  ax[iax].set_yscale('log')
+		else:
+			if par!='sig0' or (par=='sig0' and 'alt' in objs):
+				ax[iax].set_ylim([0,None])
+			else:
+				ax[iax].set_ylim([0,ax[ii].get_ylim()[1]*2])
+
+
+		ax[iax].set_xlim([0,1])
+		ax[iax].annotate(parlabs[ii],xy=(0.5,0.7),xycoords='axes fraction',ha='center',fontsize=FS+1,bbox=dict(facecolor='white',alpha=0.5, edgecolor='black', boxstyle='round,pad=0.3'))#ax[ii].set_xlabel(parlabs[ii],fontsize=FS)
+		ax[iax].tick_params(labelsize=FS)
+		if par!='sig0':
+			yy = ax[iax].get_ylim()
+			if iax<4:
+				ax[iax].set_ylim([yy[0],yy[1]*0.5])
+			else:
+				ax[iax].set_ylim([0,25000])
+		if ii<3 and ii!=0:
+			ax[iax].set_xticklabels([])
+		ax[iax].set_yticklabels([])
+		if ii==0:   ax[iax].legend(fontsize=FS+1,title='Hyperprior w/ \n'+r'$\sigma_0 \sim U(0,1)$',title_fontsize=FS+1,bbox_to_anchor=(0.5,-0.7),loc='center')
+	fig.suptitle(r'Choice of Hyperpriors',fontsize=FS+2)
+	fig.supylabel(r'Hyperprior Density',fontsize=FS)
+	pl.tight_layout()
+	fig.subplots_adjust(wspace=0.1,hspace=0.05)
+	pl.savefig(f'{rootpath}plots/hyperprior/hyperpriors2.pdf',bbox_inches='tight')
+	#pl.show()
+
 Ns = 10000000
 #Default Prior
 start = 1
@@ -113,8 +189,8 @@ dflabel   = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim \rm{Arcsine}(0,1)$"][star
 Alabel    = [r"$\sigma_{0} \sim U(0,1)$", r"$\sigma_{\rm{Rel}} \sim U(0,\sigma_0)$"][start:]
 Blabel    = [r"$\sigma_{0} \sim U(0,1)$", r"$\sigma_{\rm{Common}} \sim U(0,\sigma_0)$"][start:]
 Clabel    = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \sim U(0,1)$"][start:]
-#altlabel  = [r"$\sigma_{\rm{Rel}} \sim U(0,1)$", r"$\sigma_{\rm{Common}} \sim U(0,1)$"][start:]
 #Dlabel    = [r"$\sigma^2_{\rm{Rel}} \sim U(0,1)$", r"$\sigma^2_{\rm{Common}} \sim U(0,1)$"][start:]
+#altlabel  = [r"$\sigma_{\rm{Rel}} \sim U(0,1)$", r"$\sigma_{\rm{Common}} \sim U(0,1)$"][start:]
 p=2
 #p = 2 ;	Elabel    = [r"$\sqrt{\sigma_{\rm{Rel}}} \sim U(0,1)$", r"$\sqrt{\sigma_{\rm{Common}}} \sim U(0,1)$"][start:]
 #p = 1.5;	Elabel    = [r"$\sigma^{1/%s}_{\rm{Rel}} \sim U(0,1)$"%p, r"$\sigma^{1/%s}_{\rm{Common}} \sim U(0,1)$"%p][start:]
@@ -176,6 +252,8 @@ lw = 3 ; alph=1
 plotting_args = {'linewidth':lw, 'alpha':alph}
 objs    = ['df','A','B','C'] ; #objs    = ['df','alt','A','B','C']
 rhos    = [eval(f'rho_{x}')  for x in objs]
+xs      = [eval(f'sigR_{x}')/eval(f'sig0_{x}') for x in objs]
+ys      = [eval(f'sigC_{x}')/eval(f'sig0_{x}') for x in objs]
 sigRs   = [eval(f'sigR_{x}') for x in objs]
 sigCs   = [eval(f'sigC_{x}') for x in objs]
 sig0s   = [eval(f'sig0_{x}') for x in objs]
@@ -187,9 +265,11 @@ rho_plot()
 sig0_plot()
 sigR_plot()
 sigC_plot()
+x_plot()
+y_plot()
 #'''
 combined_plot()
-
+combined_plot2()
 
 
 '''#Plot up rho samples from LKJ(1) dist.
