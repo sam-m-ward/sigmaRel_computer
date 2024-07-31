@@ -99,16 +99,22 @@ class multi_galaxy_siblings:
 
 		End Product(s)
 		----------
-		self.cosmo, self.redshift_cols: the astropy cosmology model, and the redshift columsn in dfmus of ['zHD_hats','zcmb_hats']
-
-		dfmus[['muext_zHD_hats','muext_zcmb_hats']] computed using cosmo
+		self.cosmo, self.zcosmo_cols, self.zhelio_cols, self.mucosmo_cols:
+			the astropy cosmology model,
+			the redshift columns in dfmus of ['zcmb_hats','zHD_hats'] and ['zhelio_hats','zhelio_errs'], respectively
+			the muext columns ['muext_zcmb_hats','muext_zHD_hats']] computed using cosmo
 		"""
 		self.cosmo = FlatLambdaCDM(**self.fiducial_cosmology)
-		self.redshift_cols = [col for col in ['zHD_hats','zcmb_hats'] if col in self.dfmus.columns]
-		assert('zhelio_hats' in self.dfmus.columns)
-		for zcol in self.redshift_cols:
+		self.zcosmo_cols = [col for col in ['zcmb_hats','zHD_hats'] if col in self.dfmus.columns]
+		self.zhelio_cols = [col for col in ['zhelio_hats','zhelio_errs'] if col in self.dfmus.columns]
+		try:
+			assert('zhelio_hats' in self.dfmus.columns)
+		except:
+			print ("Need 'zhelio_hats' column to compute redshift-based cosmology distances")
+		for zcol in self.zcosmo_cols:
 			assert(zcol.split('_hats')[0]+'_errs' in self.dfmus.columns)#Check errors in either/both of zHD and zcmb are there
 			self.dfmus[f'muext_{zcol}'] = self.dfmus[['zhelio_hats',zcol]].apply(lambda z: self.cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+		self.mucosmo_cols = [f'muext_{zcol}' for zcol in self.zcosmo_cols]
 
 	def get_cosmo_subsample(self,limits={'thetas':[-1.5,2.0],'AVs':[0.0,1.0]}):
 		"""
@@ -124,15 +130,25 @@ class multi_galaxy_siblings:
 		----------
 		dfmus['cosmo_sample'] bool column
 		"""
-		bools = {}
-		for g in self.dfmus.Galaxy:
-			dfg = self.dfmus[self.dfmus.Galaxy==g]
-			bools[g] = True
-			for par in limits:
-				if par in dfg.columns and dfg[(dfg[par]<limits[par][0])|(dfg[par]>limits[par][1])].shape[0]>0:
-					bools[g] = False
-					break
-		self.dfmus['cosmo_sample'] = self.dfmus['Galaxy'].map(bools)
+		missing_pars = [par for par in limits if par not in self.dfmus.columns]
+		if len(missing_pars)==0:
+			if self.verbose: print (f'Creating cosmo. sub-samp. using: {limits}')
+			bools = {}
+			for g in self.dfmus.Galaxy:
+				dfg = self.dfmus[self.dfmus.Galaxy==g]
+				bools[g] = True
+				for par in limits:
+					if par in dfg.columns and dfg[(dfg[par]<limits[par][0])|(dfg[par]>limits[par][1])].shape[0]>0:
+						bools[g] = False
+						break
+			self.dfmus['cosmo_sample'] = self.dfmus['Galaxy'].map(bools)
+		elif len(missing_pars)>0:
+			if self.verbose:	print (f'Cosmo. sub-samp cannot be created by applying limits: {limits} because {missing_pars} missing from input columns;')
+			if 'cosmo_sample' in self.dfmus:
+				if self.verbose: print ("Instead use user-inputted 'cosmo_sample' bool column")
+			else:
+				if self.verbose: print ("Instead set all SNe as belonging to 'cosmo_sample'")
+				self.dfmus.loc[:,'cosmo_sample'] = True
 
 	def print_table(self, PARS=['mu','AV','theta','RV'],verbose=False,returner=False):
 		"""
@@ -159,13 +175,11 @@ class multi_galaxy_siblings:
 		pPARS      = ['mu','AV','theta','RV']
 		PARS       = [p for p in pPARS if p in PARS]
 		pars       = [p for p in PARS if f'{p}s' in self.parcols]
-		samp_cols  = [f'{p}_samps' for p in pars]
-		assert(samp_cols!=[])
+		samp_cols  = [f'{p}_samps' for p in pars if f'{p}_samps' in self.dfmus.columns]
 
 		keep        = [i for i,p in enumerate(self.master_parnames) if p in pars]
 		parlabels   = [x for i,x in enumerate(self.master_parlabels) if i in keep]
 		bounds      = [x for i,x in enumerate(self.master_bounds)    if i in keep]
-
 
 		plotting_parameters = {'FS':self.FS,'paperstyle':False,'quick':True,'save':False,'show':False}
 		lines = [] ; old_g = self.dfmus['Galaxy'].iloc[0]
@@ -177,10 +191,14 @@ class multi_galaxy_siblings:
 				new_g = True
 			else:
 				new_g = False if isn!=0 else True
-			samples = {par:self.dfmus[samp_col].loc[sn] for par,samp_col in zip(pars,samp_cols)}
-			Rhats   = {par:self.dfmus[f'{par}_Rhats'].loc[sn] for par in pars}
-			postplot = POSTERIOR_PLOTTER(samples, pars, parlabels, bounds, Rhats, plotting_parameters)
-			Summary_Strs = postplot.corner_plot(verbose=verbose)#Table Summary
+			try:
+				samples = {par:self.dfmus[samp_col].loc[sn] for par,samp_col in zip(pars,samp_cols)}
+				try:	Rhats   = {par:self.dfmus[f'{par}_Rhats'].loc[sn] for par in pars}
+				except:	Rhats   = {par:-1.0 for par in pars}
+				postplot = POSTERIOR_PLOTTER(samples, pars, parlabels, bounds, Rhats, plotting_parameters)
+				Summary_Strs = postplot.corner_plot(verbose=verbose)#Table Summary
+			except:
+				Summary_Strs = {par:f"${self.dfmus[f'{par}s'].loc[sn]:.2f}\pm{self.dfmus[f'{par}_errs'].loc[sn]:.2f}$" for par in pars}
 			#Create Line
 			line = self.dfmus['SN'].loc[sn].replace('_','\_') + ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,self.dfmus['Galaxy'].loc[sn].astype(str)) if new_g else '')
 			for par in all_PARS:
@@ -242,9 +260,11 @@ class multi_galaxy_siblings:
 			cosmo parameters used in astropy FlatLambdaCDM for creating external redshift-based distances
 		"""
 		#Data
+		if str(type(dfmus))=="<class 'dict'>": dfmus = pd.DataFrame(dfmus)
 		self.dfmus      = dfmus
 		self.samplename = samplename
 		self.dfmus.sort_values(['Galaxy','SN'],ascending=True,inplace=True)
+		self.verbose    = verbose
 
 		try:#Reorder and re-label galaxies. Order by redshift, and within this, by zhelio error
 			ordered_galaxies = self.dfmus.groupby('Galaxy')[['zhelio_hats','zhelio_errs']].agg('mean').sort_values(by=['zhelio_hats','zhelio_errs']).index
@@ -256,7 +276,7 @@ class multi_galaxy_siblings:
 
 		self.infer_pars()
 		self.fiducial_cosmology = fiducial_cosmology
-		self.get_redshift_distances()#Create ['muext_zHD_hats','muext_zcmb_hats'] columns
+		self.get_redshift_distances()#Create ['muext_zcmb_hats','muext_zHD_hats'] columns
 		self.get_cosmo_subsample()#Create cosmo_sample column
 		self.og_dfmus = copy.deepcopy(self.dfmus) ; self.og_samplename = copy.deepcopy(self.samplename)
 
@@ -288,9 +308,8 @@ class multi_galaxy_siblings:
 		#Other
 		self.FS = FS
 		self.c_light = 299792458
-		self.verbose = verbose
 		if self.verbose:
-			print (self.dfmus[self.parcols])
+			print (self.dfmus[['SN','Galaxy']+self.parcols+self.zhelio_cols+self.zcosmo_cols+self.mucosmo_cols])
 
 	def trim_sample(self,key='cosmo',bool_column=None):
 		"""
@@ -860,7 +879,6 @@ class multi_galaxy_siblings:
 				else:
 					delta_alpha = abs(dfgal['alpha_mu_z'].iloc[0]-dfgal['alpha_mu_z'].iloc[1])
 					imod_sib    = 0 if dfgal['alpha_mu_z'].iloc[0]>dfgal['alpha_mu_z'].iloc[1] else 1#The sibling with the larger alpha
-					#new_sigmafit = (dfgal[f'{PAR}_errs'].iloc[imod_sib]**2 + (dfgal['alpha_mu_z'].iloc[imod_sib]*dfgal['zhelio_errs'].iloc[imod_sib])**2 )**0.5
 					new_sigmafit = (dfgal[f'{PAR}_errs'].iloc[imod_sib]**2 + (delta_alpha*dfgal['zhelio_errs'].iloc[imod_sib])**2 )**0.5
 					dfgal.loc[dfgal.index.values[imod_sib],f'{PAR}_errs'] = new_sigmafit
 			#print ('After:', dfgal[['alpha_mu_z',f'{PAR}_errs']])
