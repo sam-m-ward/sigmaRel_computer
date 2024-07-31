@@ -15,6 +15,7 @@ dfmus      = {key:multigal.dfmus[key].values for key in keep_cols}
 
 #ANALYSE
 multigal = multi_galaxy_siblings(dfmus,sigma0='free',sigmapec=250,use_external_distances=True,rootpath=rootpath)
+
 '''#Print sample statistics, distance posteriors and Hubble diagrams
 print (multigal.dfmus[multigal.dfmus.zhelio_errs>0.001]['mu_errs'].mean(),multigal.dfmus[multigal.dfmus.zhelio_errs>0.001]['mu_errs'].std())
 print (multigal.dfmus['mu_errs'].mean(),multigal.dfmus['mu_errs'].std())
