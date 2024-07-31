@@ -24,7 +24,7 @@ multi_galaxy class:
 		add_transformed_params(df,fitsummary)
 		plot_posterior_samples(   FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
 		plot_posterior_samples_1D(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
-		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None)
+		compute_analytic_multi_gal_sigmaRel_posterior(PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None,prior=None)
 		loop_single_galaxy_analyses()
 		get_dxgs(Sg,ss,g_or_z)
 		plot_delta_HR(save=True,show=False)
@@ -721,7 +721,6 @@ class multi_galaxy_siblings:
 		----------
 		Plot
 		"""
-
 		#Get posterior samples
 		if 'FIT' in self.__dict__.keys():
 			FIT = self.FIT
@@ -774,12 +773,12 @@ class multi_galaxy_siblings:
 					pl.annotate(line, xy=(x0+1.1*(len(postplot.ax)==1),yy0-dy*(postplot.lc+ticker-1)),xycoords='axes fraction',
 								fontsize=FS-4,color=colour,ha='right')
 				if counter+1==Npanel:
-					pl.annotate(r"sigmaRel_Computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='black',weight='bold',ha='right',fontname='Courier New')
+					pl.annotate(r"sigmaRel_computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='black',weight='bold',ha='right',fontname='Courier New')
 					for ticker,line in enumerate(postplot.lines[line_index[0]:line_index[1]]):
 						pl.annotate(line, xy=(x0+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
 									fontsize=FS-4,color='black',ha='right')
 			elif not kwargs['lines']:
-				pl.annotate(r"sigmaRel_Computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='white',weight='bold',ha='right',fontname='Courier New')
+				pl.annotate(r"sigmaRel_computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='white',weight='bold',ha='right',fontname='Courier New')
 
 
 
@@ -807,7 +806,7 @@ class multi_galaxy_siblings:
 
 
 
-	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None):
+	def compute_analytic_multi_gal_sigmaRel_posterior(self,PAR='mu',prior_upper_bounds=[1.0],alpha_zhel=False,show=False,save=True,blind=False,fig_ax=None,prior=None):
 		"""
 		Compute Analytic Multi Galaxy sigmaRel Posterior
 
@@ -858,7 +857,8 @@ class multi_galaxy_siblings:
 				else:
 					delta_alpha = abs(dfgal['alpha_mu_z'].iloc[0]-dfgal['alpha_mu_z'].iloc[1])
 					imod_sib    = 0 if dfgal['alpha_mu_z'].iloc[0]>dfgal['alpha_mu_z'].iloc[1] else 1#The sibling with the larger alpha
-					new_sigmafit = (dfgal[f'{PAR}_errs'].iloc[imod_sib]**2 + (dfgal['alpha_mu_z'].iloc[imod_sib]*dfgal['zhelio_errs'].iloc[imod_sib])**2 )**0.5
+					#new_sigmafit = (dfgal[f'{PAR}_errs'].iloc[imod_sib]**2 + (dfgal['alpha_mu_z'].iloc[imod_sib]*dfgal['zhelio_errs'].iloc[imod_sib])**2 )**0.5
+					new_sigmafit = (dfgal[f'{PAR}_errs'].iloc[imod_sib]**2 + (delta_alpha*dfgal['zhelio_errs'].iloc[imod_sib])**2 )**0.5
 					dfgal.loc[dfgal.index.values[imod_sib],f'{PAR}_errs'] = new_sigmafit
 			#print ('After:', dfgal[['alpha_mu_z',f'{PAR}_errs']])
 			return dfgal
@@ -879,6 +879,26 @@ class multi_galaxy_siblings:
 				if g==0:
 					total_posteriors[p] *= 1/p#Prior only appears once
 					sigRs_store[p] = sibgal.sigRs_store[p]
+
+		#Add in custom hyperprior
+		def get_sigR_prior(prior,sigRs):
+			if prior in ['uniform',None]:
+				return np.ones(len(sigRs))
+			elif prior in ['p2']:
+				return sigRs
+			elif prior in ['jeffreys']:
+				return 1/sigRs
+			elif prior[0]=='p':
+				#return np.power(sigRs,float(prior[1:])-1)#e.g. prior='p2' is sigRs^{1}
+				return np.power(sigRs,float(prior[1:])-1)#*np.power(1-np.square(sigRs),float(prior[1:])/2-1)#e.g. prior='p2' is sigRs^{1}
+			else:
+				raise Exception('Selected prior not defined')
+
+		if prior is not None:
+			assert(type(prior)==str)
+			for p in self.prior_upper_bounds:
+				total_posteriors[p] =  copy.deepcopy(total_posteriors[p])*get_sigR_prior(prior,sibgal.sigRs_store[p])
+
 		#Plot posteriors
 		if self.verbose:
 			#Use single-galaxy class for plotting
