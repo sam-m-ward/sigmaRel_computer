@@ -298,7 +298,7 @@ class multi_galaxy_siblings:
 		self.sigmapec               = sigmapec
 		self.eta_sigmaRel_input     = eta_sigmaRel_input
 		self.use_external_distances = use_external_distances
-		self.zcosmos			    = zcosmo
+		self.zcosmo			        = zcosmo
 
 		#Paths
 		self.rootpath    = rootpath
@@ -667,7 +667,7 @@ class multi_galaxy_siblings:
 		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
 		if fig_ax is None:#Single Plot
 			postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
-			colour = None if 'colour' not in kwargs.keys() else kwargs['colour'] ; counter = 0; Npanel = 1; line_index = [None,None] ; multiplot = False ; postplot.y0 = None
+			colour = None if 'colour' not in kwargs.keys() else kwargs['colour'] ; counter = 0; Npanel = 1; line_index = [[None,None]] ; multiplot = False ; postplot.y0 = None
 		else:
 			multiplot = True
 			if fig_ax[0] is None:#Multiplot, and first instance
@@ -678,10 +678,11 @@ class multi_galaxy_siblings:
 				postplot.chains  = [postplot.samples[par] for par in postplot.parnames]
 				postplot.choices = self.plotting_parameters
 			counter,Npanel,line_index,legend_labels = fig_ax[1:5]
+			if type(line_index[0]) is not list: line_index = [line_index]
 			colour = f'C{counter + (0 if len(fig_ax)==5 else fig_ax[5])}'
 			postplot.lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
 			if counter==0 and fig_ax[0] is None:
-				postplot.lc = len(postplot.lines[line_index[0]:line_index[1]])
+				postplot.lc = sum([len(postplot.lines[ll[0]:ll[1]]) for ll in line_index])#len(postplot.lines[line_index[0]:line_index[1]])
 			postplot.y0  = len(self.parnames)+(Npanel+1*(len(self.parnames)<4))*0.15
 			FS += 0 + -2*(len(self.parnames)<4)
 
@@ -693,14 +694,23 @@ class multi_galaxy_siblings:
 				pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(postplot.lc+ticker-1)),xycoords='axes fraction',
 							fontsize=FS-4,color=colour,ha='right')
 			if counter+1==Npanel:
-				for ticker,line in enumerate(postplot.lines[line_index[0]:line_index[1]]):
-					pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
-								fontsize=FS-4,color='black',ha='right')
+				ticker = -1
+				for ll in line_index:
+					for line in postplot.lines[ll[0]:ll[1]]:
+						ticker+=1
+						pl.annotate(line, xy=(1+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
+									fontsize=FS-4,color='black',ha='right')
 
 		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
 		if counter+1==Npanel:
-			finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[line_index[0]:line_index[1]]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,colour if not multiplot else 'black',y0=postplot.y0,lines= not multiplot)
+			if counter+1==Npanel:
+				LINES = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
+				LINES = [LINES[ll[0]:ll[1]] for ll in line_index]
+				LINES = [L for LL in LINES for L in LL]
+			elif counter+1!=Npanel:
+				LINES = []
+			finish_corner_plot(postplot.fig,postplot.ax,LINES,save,show,self.plotpath,savekey,colour if not multiplot else 'black',y0=postplot.y0,lines= not multiplot)
 
 		if multiplot and legend_labels!=['']: postplot.lc += len(legend_labels)
 		#Return posterior summaries
@@ -778,7 +788,7 @@ class multi_galaxy_siblings:
 		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
 		if fig_ax is None:#Single Plot
 			postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
-			colour = None ; counter = 0; Npanel = 1; line_index = [None,None] ; multiplot = False ; postplot.y0 = None
+			colour = None ; counter = 0; Npanel = 1; line_index = [[None,None]] ; multiplot = False ; postplot.y0 = None
 		else:
 			multiplot = True
 			if fig_ax[0] is None:#Multiplot, and first instance
@@ -789,10 +799,11 @@ class multi_galaxy_siblings:
 				postplot.chains  = [postplot.samples[par] for par in postplot.parnames]
 				postplot.choices = self.plotting_parameters
 			counter,Npanel,line_index,legend_labels = fig_ax[1:5]
+			if type(line_index[0]) is not list: line_index = [line_index]
 			colour = f'C{counter + (0 if len(fig_ax)==5 else fig_ax[5])}'
 			postplot.lines  = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
 			if counter==0 and fig_ax[0] is None:
-				postplot.lc = len(postplot.lines[line_index[0]:line_index[1]])
+				postplot.lc = sum([len(postplot.lines[ll[0]:ll[1]]) for ll in line_index])#len(postplot.lines[line_index[0]:line_index[1]])
 			postplot.y0  = 1.3#len(self.parnames)+(Npanel+1*(len(self.parnames)<4))*0.15
 			FS += 0 + -2*(len(self.parnames)<4)
 
@@ -807,9 +818,12 @@ class multi_galaxy_siblings:
 								fontsize=FS-4,color=colour,ha='right')
 				if counter+1==Npanel:
 					pl.annotate(r"sigmaRel_computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='black',weight='bold',ha='right',fontname='Courier New')
-					for ticker,line in enumerate(postplot.lines[line_index[0]:line_index[1]]):
-						pl.annotate(line, xy=(x0+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
-									fontsize=FS-4,color='black',ha='right')
+					ticker = -1
+					for ll in line_index:
+						for line in postplot.lines[ll[0]:ll[1]]:
+							ticker += 1
+							pl.annotate(line, xy=(x0+1.1*(len(postplot.ax)==1),yy0-dy*(ticker-1)),xycoords='axes fraction',
+										fontsize=FS-4,color='black',ha='right')
 			elif not kwargs['lines']:
 				pl.annotate(r"sigmaRel_computer",     xy=(x0+1.1*(len(postplot.ax)==1),postplot.y0-0.025),xycoords='axes fraction',fontsize=18,color='white',weight='bold',ha='right',fontname='Courier New')
 
@@ -824,7 +838,13 @@ class multi_galaxy_siblings:
 			if multiplot:
 				for col in range(len(self.parnames)):
 					postplot.ax[0,col].set_ylim([0,postplot.ax[0,col].get_ylim()[1]])
-			finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)[line_index[0]:line_index[1]]*(counter+1==Npanel) + []*(counter+1!=Npanel),save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=postplot.y0,lines= not multiplot,oneD=True)
+			if counter+1==Npanel:
+				LINES = get_Lines(stan_data,self.c_light,modelloader.alt_prior,modelloader.zcosmo,modelloader.alpha_zhel)
+				LINES = [LINES[ll[0]:ll[1]] for ll in line_index]
+				LINES = [L for LL in LINES for L in LL]
+			elif counter+1!=Npanel:
+				LINES = []
+			finish_corner_plot(postplot.fig,postplot.ax,LINES,save,show,self.plotpath,savekey,None if not multiplot else 'black',y0=postplot.y0,lines= not multiplot,oneD=True)
 
 		if multiplot and legend_labels!=['']: postplot.lc += len(legend_labels)
 		#Return posterior summaries
