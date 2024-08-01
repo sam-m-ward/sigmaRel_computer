@@ -979,6 +979,15 @@ def get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel):
 	elif alt_prior==True:
 		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, 1.0, 'mag')
 		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Common}', sigmaRelstr, 1.0, 'mag')
+	elif alt_prior=='A':
+		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
+		Lines.append(r"$\sigma_{\rm{Rel}} \sim U(0,\sigma_0)$")
+	elif alt_prior=='B':
+		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
+		Lines.append(r"$\sigma_{\rm{Common}} \sim U(0,\sigma_0)$")
+	elif alt_prior=='C':
+		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
+		Lines.append(r"$\rho \sim U(0,1)$")
 	else:#Alt priors from list
 		Lines = add_sigma_Line(Lines, fixed_sigma0, '0', sigma0, 1.0, 'mag')
 		Lines = add_sigma_Line(Lines, fixed_sigmaRel, '\\rm{Rel}',sigmaRelstr, '\sigma_0', 'mag')
