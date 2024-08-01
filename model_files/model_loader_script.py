@@ -52,8 +52,12 @@ class ModelLoader:
 			if True, use z_g data and draw Gaussian z_g parameters
 
 		alt_prior : bool
-			two choices of prior are [sigma0~Prior and sigmaRel~U(0,sigma0)] OR [sigmaRel~Prior; sigmaCommon~Prior]
+			two default choices of prior are [sigma0~Uniform and rho~Arcsine(0,1)] OR [sigmaRel~Prior; sigmaCommon~Prior]
 			alt_prior=False is former, alt_prior=True is latter
+			Other choices include:
+				-A: sigR ~ U(0,sig0)
+				-B: sigC ~ U(0,sig0)
+				-C: rho  ~ U(0,1)
 
 		zcosmo : str
 			choice of zHD or zcmb
@@ -70,6 +74,8 @@ class ModelLoader:
 		self.use_external_distances = use_external_distances
 		self.zmarg					= zmarg
 		self.alt_prior              = alt_prior
+		if self.alt_prior=='arcsine': self.alt_prior=False#Simple mapping, arcsine hyperprior on rho
+		if self.alt_prior=='uniform': self.alt_prior='C'  #Simple mapping, uniform hyperprior on rho
 		self.zcosmo                 = zcosmo
 		self.alpha_zhel             = alpha_zhel
 
@@ -106,6 +112,8 @@ class ModelLoader:
 			self.sigmaRel_input     = 1
 		if self.use_external_distances is None:
 			self.use_external_distances = self.choices.use_external_distances
+		if self.zcosmo is None:
+			self.zcosmo = self.choices.zcosmo
 
 	def get_modelkey(self):
 		"""
