@@ -4,23 +4,25 @@ namespace CombineIndividualDistances_dMMixed_model_namespace {
 using stan::model::model_base_crtp;
 using namespace stan::math;
 stan::math::profile_map profiles__;
-static constexpr std::array<const char*, 25> locations_array__ =
+static constexpr std::array<const char*, 27> locations_array__ =
   {" (found before start of program)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 11, column 2 to column 39)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 12, column 2 to column 25)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 13, column 2 to column 21)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 14, column 2 to column 10)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 18, column 2 to column 28)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 19, column 2 to column 21)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 20, column 2 to column 17)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 22, column 2 to column 54)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 24, column 2 to column 41)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 25, column 2 to column 42)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 29, column 2 to column 36)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 30, column 2 to column 31)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 31, column 2 to column 31)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 32, column 2 to column 38)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 34, column 2 to column 58)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 12, column 2 to column 28)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 13, column 2 to column 25)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 14, column 2 to column 21)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 15, column 2 to column 10)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 19, column 2 to column 25)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 20, column 2 to column 28)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 21, column 2 to column 21)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 22, column 2 to column 17)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 24, column 2 to column 35)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 25, column 2 to column 33)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 27, column 2 to column 41)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 28, column 2 to column 42)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 33, column 2 to column 32)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 34, column 2 to column 31)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 35, column 2 to column 31)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 36, column 2 to column 38)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 38, column 2 to column 58)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 2, column 2 to column 17)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 3, column 9 to column 10)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 3, column 2 to column 17)",
@@ -28,8 +30,8 @@ static constexpr std::array<const char*, 25> locations_array__ =
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 4, column 2 to column 21)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 6, column 2 to column 15)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 7, column 2 to column 23)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 12, column 9 to column 10)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 19, column 9 to column 10)"};
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 13, column 9 to column 10)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 21, column 9 to column 10)"};
 class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<CombineIndividualDistances_dMMixed_model> {
  private:
   int S;
@@ -61,17 +63,17 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     try {
       int pos__ = std::numeric_limits<int>::min();
       pos__ = 1;
-      current_statement__ = 16;
+      current_statement__ = 18;
       context__.validate_dims("data initialization", "S", "int",
         std::vector<size_t>{});
       S = std::numeric_limits<int>::min();
-      current_statement__ = 16;
-      S = context__.vals_i("S")[(1 - 1)];
-      current_statement__ = 16;
-      stan::math::check_greater_or_equal(function__, "S", S, 1);
-      current_statement__ = 17;
-      stan::math::validate_non_negative_index("mu_s", "S", S);
       current_statement__ = 18;
+      S = context__.vals_i("S")[(1 - 1)];
+      current_statement__ = 18;
+      stan::math::check_greater_or_equal(function__, "S", S, 1);
+      current_statement__ = 19;
+      stan::math::validate_non_negative_index("mu_s", "S", S);
+      current_statement__ = 20;
       context__.validate_dims("data initialization", "mu_s", "double",
         std::vector<size_t>{static_cast<size_t>(S)});
       mu_s_data__ = Eigen::Matrix<double,-1,1>::Constant(S,
@@ -80,7 +82,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
         S);
       {
         std::vector<local_scalar_t__> mu_s_flat__;
-        current_statement__ = 18;
+        current_statement__ = 20;
         mu_s_flat__ = context__.vals_r("mu_s");
         pos__ = 1;
         for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
@@ -89,9 +91,9 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
           pos__ = (pos__ + 1);
         }
       }
-      current_statement__ = 19;
+      current_statement__ = 21;
       stan::math::validate_non_negative_index("mu_err_s", "S", S);
-      current_statement__ = 20;
+      current_statement__ = 22;
       context__.validate_dims("data initialization", "mu_err_s", "double",
         std::vector<size_t>{static_cast<size_t>(S)});
       mu_err_s_data__ = Eigen::Matrix<double,-1,1>::Constant(S,
@@ -100,7 +102,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
         Eigen::Map<Eigen::Matrix<double,-1,1>>(mu_err_s_data__.data(), S);
       {
         std::vector<local_scalar_t__> mu_err_s_flat__;
-        current_statement__ = 20;
+        current_statement__ = 22;
         mu_err_s_flat__ = context__.vals_r("mu_err_s");
         pos__ = 1;
         for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
@@ -109,23 +111,23 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
           pos__ = (pos__ + 1);
         }
       }
-      current_statement__ = 21;
+      current_statement__ = 23;
       context__.validate_dims("data initialization", "mean_mu", "double",
         std::vector<size_t>{});
       mean_mu = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 21;
+      current_statement__ = 23;
       mean_mu = context__.vals_r("mean_mu")[(1 - 1)];
-      current_statement__ = 22;
+      current_statement__ = 24;
       context__.validate_dims("data initialization", "sigma0", "double",
         std::vector<size_t>{});
       sigma0 = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 22;
-      sigma0 = context__.vals_r("sigma0")[(1 - 1)];
-      current_statement__ = 22;
-      stan::math::check_greater_or_equal(function__, "sigma0", sigma0, 0);
-      current_statement__ = 23;
-      stan::math::validate_non_negative_index("eta_dM_Rel_s", "S", S);
       current_statement__ = 24;
+      sigma0 = context__.vals_r("sigma0")[(1 - 1)];
+      current_statement__ = 24;
+      stan::math::check_greater_or_equal(function__, "sigma0", sigma0, 0);
+      current_statement__ = 25;
+      stan::math::validate_non_negative_index("eta_dM_Rel_s", "S", S);
+      current_statement__ = 26;
       stan::math::validate_non_negative_index("dM_Rel_s", "S", S);
     } catch (const std::exception& e) {
       stan::lang::rethrow_located(e, locations_array__[current_statement__]);
@@ -161,10 +163,10 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     // suppress unused var warning
     (void) function__;
     try {
-      local_scalar_t__ sigmaRel = DUMMY_VAR__;
+      local_scalar_t__ rho = DUMMY_VAR__;
       current_statement__ = 1;
-      sigmaRel = in__.template read_constrain_lub<local_scalar_t__,
-                   jacobian__>(0, sigma0, lp__);
+      rho = in__.template read_constrain_lub<local_scalar_t__, jacobian__>(0,
+              1, lp__);
       Eigen::Matrix<local_scalar_t__,-1,1> eta_dM_Rel_s =
         Eigen::Matrix<local_scalar_t__,-1,1>::Constant(S, DUMMY_VAR__);
       current_statement__ = 2;
@@ -176,32 +178,36 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
       local_scalar_t__ mu = DUMMY_VAR__;
       current_statement__ = 4;
       mu = in__.template read<local_scalar_t__>();
+      local_scalar_t__ sigmaRel = DUMMY_VAR__;
       local_scalar_t__ sigmaCommon = DUMMY_VAR__;
       Eigen::Matrix<local_scalar_t__,-1,1> dM_Rel_s =
         Eigen::Matrix<local_scalar_t__,-1,1>::Constant(S, DUMMY_VAR__);
       local_scalar_t__ dM_Common = DUMMY_VAR__;
-      current_statement__ = 8;
-      sigmaCommon = stan::math::sqrt((stan::math::square(sigma0) -
-                      stan::math::square(sigmaRel)));
       current_statement__ = 9;
+      sigmaRel = (stan::math::sqrt((1 - rho)) * sigma0);
+      current_statement__ = 10;
+      sigmaCommon = (stan::math::sqrt(rho) * sigma0);
+      current_statement__ = 11;
       stan::model::assign(dM_Rel_s,
         stan::math::multiply(sigmaRel, eta_dM_Rel_s),
         "assigning variable dM_Rel_s");
-      current_statement__ = 10;
+      current_statement__ = 12;
       dM_Common = (sigmaCommon * eta_dM_Common);
       current_statement__ = 5;
+      stan::math::check_greater_or_equal(function__, "sigmaRel", sigmaRel, 0);
+      current_statement__ = 6;
       stan::math::check_greater_or_equal(function__, "sigmaCommon",
         sigmaCommon, 0);
       {
-        current_statement__ = 11;
-        lp_accum__.add(stan::math::uniform_lpdf<propto__>(sigmaRel, 0, sigma0));
-        current_statement__ = 12;
-        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Rel_s));
         current_statement__ = 13;
-        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Common));
+        lp_accum__.add(stan::math::beta_lpdf<propto__>(rho, 0.5, 0.5));
         current_statement__ = 14;
-        lp_accum__.add(stan::math::normal_lpdf<propto__>(mu, mean_mu, 100));
+        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Rel_s));
         current_statement__ = 15;
+        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Common));
+        current_statement__ = 16;
+        lp_accum__.add(stan::math::normal_lpdf<propto__>(mu, mean_mu, 100));
+        current_statement__ = 17;
         lp_accum__.add(stan::math::normal_lpdf<propto__>(mu_s,
                          stan::math::add(stan::math::add(mu, dM_Rel_s),
                            dM_Common), mu_err_s));
@@ -234,10 +240,10 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     // suppress unused var warning
     (void) function__;
     try {
-      local_scalar_t__ sigmaRel = DUMMY_VAR__;
+      local_scalar_t__ rho = DUMMY_VAR__;
       current_statement__ = 1;
-      sigmaRel = in__.template read_constrain_lub<local_scalar_t__,
-                   jacobian__>(0, sigma0, lp__);
+      rho = in__.template read_constrain_lub<local_scalar_t__, jacobian__>(0,
+              1, lp__);
       Eigen::Matrix<local_scalar_t__,-1,1> eta_dM_Rel_s =
         Eigen::Matrix<local_scalar_t__,-1,1>::Constant(S, DUMMY_VAR__);
       current_statement__ = 2;
@@ -249,32 +255,36 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
       local_scalar_t__ mu = DUMMY_VAR__;
       current_statement__ = 4;
       mu = in__.template read<local_scalar_t__>();
+      local_scalar_t__ sigmaRel = DUMMY_VAR__;
       local_scalar_t__ sigmaCommon = DUMMY_VAR__;
       Eigen::Matrix<local_scalar_t__,-1,1> dM_Rel_s =
         Eigen::Matrix<local_scalar_t__,-1,1>::Constant(S, DUMMY_VAR__);
       local_scalar_t__ dM_Common = DUMMY_VAR__;
-      current_statement__ = 8;
-      sigmaCommon = stan::math::sqrt((stan::math::square(sigma0) -
-                      stan::math::square(sigmaRel)));
       current_statement__ = 9;
+      sigmaRel = (stan::math::sqrt((1 - rho)) * sigma0);
+      current_statement__ = 10;
+      sigmaCommon = (stan::math::sqrt(rho) * sigma0);
+      current_statement__ = 11;
       stan::model::assign(dM_Rel_s,
         stan::math::multiply(sigmaRel, eta_dM_Rel_s),
         "assigning variable dM_Rel_s");
-      current_statement__ = 10;
+      current_statement__ = 12;
       dM_Common = (sigmaCommon * eta_dM_Common);
       current_statement__ = 5;
+      stan::math::check_greater_or_equal(function__, "sigmaRel", sigmaRel, 0);
+      current_statement__ = 6;
       stan::math::check_greater_or_equal(function__, "sigmaCommon",
         sigmaCommon, 0);
       {
-        current_statement__ = 11;
-        lp_accum__.add(stan::math::uniform_lpdf<propto__>(sigmaRel, 0, sigma0));
-        current_statement__ = 12;
-        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Rel_s));
         current_statement__ = 13;
-        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Common));
+        lp_accum__.add(stan::math::beta_lpdf<propto__>(rho, 0.5, 0.5));
         current_statement__ = 14;
-        lp_accum__.add(stan::math::normal_lpdf<propto__>(mu, mean_mu, 100));
+        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Rel_s));
         current_statement__ = 15;
+        lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Common));
+        current_statement__ = 16;
+        lp_accum__.add(stan::math::normal_lpdf<propto__>(mu, mean_mu, 100));
+        current_statement__ = 17;
         lp_accum__.add(stan::math::normal_lpdf<propto__>(mu_s,
                          stan::math::add(stan::math::add(mu, dM_Rel_s),
                            dM_Common), mu_err_s));
@@ -318,10 +328,10 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     // suppress unused var warning
     (void) function__;
     try {
-      double sigmaRel = std::numeric_limits<double>::quiet_NaN();
+      double rho = std::numeric_limits<double>::quiet_NaN();
       current_statement__ = 1;
-      sigmaRel = in__.template read_constrain_lub<local_scalar_t__,
-                   jacobian__>(0, sigma0, lp__);
+      rho = in__.template read_constrain_lub<local_scalar_t__, jacobian__>(0,
+              1, lp__);
       Eigen::Matrix<double,-1,1> eta_dM_Rel_s =
         Eigen::Matrix<double,-1,1>::Constant(S,
           std::numeric_limits<double>::quiet_NaN());
@@ -334,12 +344,13 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
       double mu = std::numeric_limits<double>::quiet_NaN();
       current_statement__ = 4;
       mu = in__.template read<local_scalar_t__>();
+      double sigmaRel = std::numeric_limits<double>::quiet_NaN();
       double sigmaCommon = std::numeric_limits<double>::quiet_NaN();
       Eigen::Matrix<double,-1,1> dM_Rel_s =
         Eigen::Matrix<double,-1,1>::Constant(S,
           std::numeric_limits<double>::quiet_NaN());
       double dM_Common = std::numeric_limits<double>::quiet_NaN();
-      out__.write(sigmaRel);
+      out__.write(rho);
       out__.write(eta_dM_Rel_s);
       out__.write(eta_dM_Common);
       out__.write(mu);
@@ -348,19 +359,23 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
             stan::math::primitive_value(emit_generated_quantities__)))) {
         return ;
       }
-      current_statement__ = 8;
-      sigmaCommon = stan::math::sqrt((stan::math::square(sigma0) -
-                      stan::math::square(sigmaRel)));
       current_statement__ = 9;
+      sigmaRel = (stan::math::sqrt((1 - rho)) * sigma0);
+      current_statement__ = 10;
+      sigmaCommon = (stan::math::sqrt(rho) * sigma0);
+      current_statement__ = 11;
       stan::model::assign(dM_Rel_s,
         stan::math::multiply(sigmaRel, eta_dM_Rel_s),
         "assigning variable dM_Rel_s");
-      current_statement__ = 10;
+      current_statement__ = 12;
       dM_Common = (sigmaCommon * eta_dM_Common);
       current_statement__ = 5;
+      stan::math::check_greater_or_equal(function__, "sigmaRel", sigmaRel, 0);
+      current_statement__ = 6;
       stan::math::check_greater_or_equal(function__, "sigmaCommon",
         sigmaCommon, 0);
       if (emit_transformed_parameters__) {
+        out__.write(sigmaRel);
         out__.write(sigmaCommon);
         out__.write(dM_Rel_s);
         out__.write(dM_Common);
@@ -386,10 +401,10 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     // suppress unused var warning
     (void) DUMMY_VAR__;
     try {
-      local_scalar_t__ sigmaRel = DUMMY_VAR__;
+      local_scalar_t__ rho = DUMMY_VAR__;
       current_statement__ = 1;
-      sigmaRel = in__.read<local_scalar_t__>();
-      out__.write_free_lub(0, sigma0, sigmaRel);
+      rho = in__.read<local_scalar_t__>();
+      out__.write_free_lub(0, 1, rho);
       Eigen::Matrix<local_scalar_t__,-1,1> eta_dM_Rel_s =
         Eigen::Matrix<local_scalar_t__,-1,1>::Constant(S, DUMMY_VAR__);
       current_statement__ = 2;
@@ -421,8 +436,8 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     (void) DUMMY_VAR__;
     try {
       current_statement__ = 1;
-      context__.validate_dims("parameter initialization", "sigmaRel",
-        "double", std::vector<size_t>{});
+      context__.validate_dims("parameter initialization", "rho", "double",
+        std::vector<size_t>{});
       current_statement__ = 2;
       context__.validate_dims("parameter initialization", "eta_dM_Rel_s",
         "double", std::vector<size_t>{static_cast<size_t>(S)});
@@ -434,10 +449,10 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
         std::vector<size_t>{});
       int pos__ = std::numeric_limits<int>::min();
       pos__ = 1;
-      local_scalar_t__ sigmaRel = DUMMY_VAR__;
+      local_scalar_t__ rho = DUMMY_VAR__;
       current_statement__ = 1;
-      sigmaRel = context__.vals_r("sigmaRel")[(1 - 1)];
-      out__.write_free_lub(0, sigma0, sigmaRel);
+      rho = context__.vals_r("rho")[(1 - 1)];
+      out__.write_free_lub(0, 1, rho);
       Eigen::Matrix<local_scalar_t__,-1,1> eta_dM_Rel_s =
         Eigen::Matrix<local_scalar_t__,-1,1>::Constant(S, DUMMY_VAR__);
       {
@@ -468,10 +483,11 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
   get_param_names(std::vector<std::string>& names__, const bool
                   emit_transformed_parameters__ = true, const bool
                   emit_generated_quantities__ = true) const {
-    names__ = std::vector<std::string>{"sigmaRel", "eta_dM_Rel_s",
+    names__ = std::vector<std::string>{"rho", "eta_dM_Rel_s",
                 "eta_dM_Common", "mu"};
     if (emit_transformed_parameters__) {
-      std::vector<std::string> temp{"sigmaCommon", "dM_Rel_s", "dM_Common"};
+      std::vector<std::string>
+        temp{"sigmaRel", "sigmaCommon", "dM_Rel_s", "dM_Common"};
       names__.reserve(names__.size() + temp.size());
       names__.insert(names__.end(), temp.begin(), temp.end());
     }
@@ -486,7 +502,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
                 std::vector<size_t>{}, std::vector<size_t>{}};
     if (emit_transformed_parameters__) {
       std::vector<std::vector<size_t>>
-        temp{std::vector<size_t>{},
+        temp{std::vector<size_t>{}, std::vector<size_t>{},
              std::vector<size_t>{static_cast<size_t>(S)},
              std::vector<size_t>{}};
       dimss__.reserve(dimss__.size() + temp.size());
@@ -498,7 +514,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
   constrained_param_names(std::vector<std::string>& param_names__, bool
                           emit_transformed_parameters__ = true, bool
                           emit_generated_quantities__ = true) const final {
-    param_names__.emplace_back(std::string() + "sigmaRel");
+    param_names__.emplace_back(std::string() + "rho");
     for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
       param_names__.emplace_back(std::string() + "eta_dM_Rel_s" + '.' +
         std::to_string(sym1__));
@@ -506,6 +522,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     param_names__.emplace_back(std::string() + "eta_dM_Common");
     param_names__.emplace_back(std::string() + "mu");
     if (emit_transformed_parameters__) {
+      param_names__.emplace_back(std::string() + "sigmaRel");
       param_names__.emplace_back(std::string() + "sigmaCommon");
       for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
         param_names__.emplace_back(std::string() + "dM_Rel_s" + '.' +
@@ -519,7 +536,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
   unconstrained_param_names(std::vector<std::string>& param_names__, bool
                             emit_transformed_parameters__ = true, bool
                             emit_generated_quantities__ = true) const final {
-    param_names__.emplace_back(std::string() + "sigmaRel");
+    param_names__.emplace_back(std::string() + "rho");
     for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
       param_names__.emplace_back(std::string() + "eta_dM_Rel_s" + '.' +
         std::to_string(sym1__));
@@ -527,6 +544,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     param_names__.emplace_back(std::string() + "eta_dM_Common");
     param_names__.emplace_back(std::string() + "mu");
     if (emit_transformed_parameters__) {
+      param_names__.emplace_back(std::string() + "sigmaRel");
       param_names__.emplace_back(std::string() + "sigmaCommon");
       for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
         param_names__.emplace_back(std::string() + "dM_Rel_s" + '.' +
@@ -537,10 +555,10 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     if (emit_generated_quantities__) {}
   }
   inline std::string get_constrained_sizedtypes() const {
-    return std::string("[{\"name\":\"sigmaRel\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"eta_dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"parameters\"},{\"name\":\"eta_dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"mu\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"sigmaCommon\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"}]");
+    return std::string("[{\"name\":\"rho\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"eta_dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"parameters\"},{\"name\":\"eta_dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"mu\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"sigmaRel\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"},{\"name\":\"sigmaCommon\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"}]");
   }
   inline std::string get_unconstrained_sizedtypes() const {
-    return std::string("[{\"name\":\"sigmaRel\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"eta_dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"parameters\"},{\"name\":\"eta_dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"mu\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"sigmaCommon\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"}]");
+    return std::string("[{\"name\":\"rho\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"eta_dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"parameters\"},{\"name\":\"eta_dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"mu\",\"type\":{\"name\":\"real\"},\"block\":\"parameters\"},{\"name\":\"sigmaRel\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"},{\"name\":\"sigmaCommon\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Rel_s\",\"type\":{\"name\":\"vector\",\"length\":" + std::to_string(S) + "},\"block\":\"transformed_parameters\"},{\"name\":\"dM_Common\",\"type\":{\"name\":\"real\"},\"block\":\"transformed_parameters\"}]");
   }
   // Begin method overload boilerplate
   template <typename RNG> inline void
@@ -550,8 +568,8 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
               emit_generated_quantities = true, std::ostream*
               pstream = nullptr) const {
     const size_t num_params__ = (((1 + S) + 1) + 1);
-    const size_t num_transformed = emit_transformed_parameters * (((1 + S) +
-      1));
+    const size_t num_transformed = emit_transformed_parameters * ((((1 + 1) +
+      S) + 1));
     const size_t num_gen_quantities = emit_generated_quantities * (0);
     const size_t num_to_write = num_params__ + num_transformed +
       num_gen_quantities;
@@ -568,8 +586,8 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
               emit_generated_quantities = true, std::ostream*
               pstream = nullptr) const {
     const size_t num_params__ = (((1 + S) + 1) + 1);
-    const size_t num_transformed = emit_transformed_parameters * (((1 + S) +
-      1));
+    const size_t num_transformed = emit_transformed_parameters * ((((1 + 1) +
+      S) + 1));
     const size_t num_gen_quantities = emit_generated_quantities * (0);
     const size_t num_to_write = num_params__ + num_transformed +
       num_gen_quantities;
