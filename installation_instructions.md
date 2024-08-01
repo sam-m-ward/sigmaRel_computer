@@ -10,6 +10,6 @@ Create a new directory, and in that, clone the GitHub repo
 
 `conda create -n sigmaRel -c conda-forge cmdstanpy==1.0.0` <br>
 `conda activate sigmaRel` <br>
-`pip install astropy arviz jupyter`
+`pip install -r requirements.txt`
 
 ### All done!
