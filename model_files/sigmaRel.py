@@ -8,7 +8,7 @@ siblings_galaxy class same as multi_galaxy class but just for a single siblings 
 Contains:
 --------------------
 multi_galaxy class:
-	inputs: dfmus,samplename='full',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}
+	inputs: dfmus,samplename='full',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,zcosmo='zHD',rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}
 
 	Methods are:
 		create_paths()
@@ -113,7 +113,11 @@ class multi_galaxy_siblings:
 			print ("Need 'zhelio_hats' column to compute redshift-based cosmology distances")
 		for zcol in self.zcosmo_cols:
 			assert(zcol.split('_hats')[0]+'_errs' in self.dfmus.columns)#Check errors in either/both of zHD and zcmb are there
-			self.dfmus[f'muext_{zcol}'] = self.dfmus[['zhelio_hats',zcol]].apply(lambda z: self.cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+			if f'muext_{zcol}' not in self.dfmus.columns:
+				print (f"Computing muext_{zcol} from fiducial cosmology: {self.fiducial_cosmology}, and columns: 'zhelio_hats', '{zcol}'")
+				self.dfmus[f'muext_{zcol}'] = self.dfmus[['zhelio_hats',zcol]].apply(lambda z: self.cosmo.distmod(z[1]).value + 5*np.log10((1+z[0])/(1+z[1])),axis=1)
+			else:
+				print (f'Using pre-supplied cosmology distances: muext_{zcol}')
 		self.mucosmo_cols = [f'muext_{zcol}' for zcol in self.zcosmo_cols]
 
 	def get_cosmo_subsample(self,limits={'thetas':[-1.5,2.0],'AVs':[0.0,1.0]}):
@@ -221,7 +225,7 @@ class multi_galaxy_siblings:
 
 
 
-	def __init__(self,dfmus,samplename='full',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}):
+	def __init__(self,dfmus,samplename='full',sigma0=0.1,sigmapec=250,eta_sigmaRel_input=None,use_external_distances=False,zcosmo='zHD',rootpath='./',FS=18,verbose=True,fiducial_cosmology={'H0':73.24,'Om0':0.28}):
 		"""
 		Initialisation
 
@@ -246,6 +250,10 @@ class multi_galaxy_siblings:
 
 		use_external_distances : bool (optional; default=False)
 			option to include external distance constraints
+
+		zcosmo : str (optional; default='zHD')
+			choice of whether cosmology redshift is flow-corrected zHD_hats or un-flow-corrected zcmb_hats
+			'zHD' or 'zcmb'
 
 		rootpath : str
 			path/to/sigmaRel/rootpath
@@ -290,6 +298,7 @@ class multi_galaxy_siblings:
 		self.sigmapec               = sigmapec
 		self.eta_sigmaRel_input     = eta_sigmaRel_input
 		self.use_external_distances = use_external_distances
+		self.zcosmos			    = zcosmo
 
 		#Paths
 		self.rootpath    = rootpath
@@ -354,7 +363,7 @@ class multi_galaxy_siblings:
 			pd.testing.assert_frame_equal(self.dfmus,self.og_dfmus)#Assert they are the same
 			print ('Full sample already in use')
 
-	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances']):
+	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances','zcosmo']):
 		"""
 		Updated Attributes
 
@@ -410,7 +419,7 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, Rhat_threshold=np.inf, Ntrials=1):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo=None, alpha_zhel=False, Rhat_threshold=np.inf, Ntrials=1):
 		"""
 		sigmaRel Sampler
 
@@ -456,8 +465,10 @@ class multi_galaxy_siblings:
 		blind : bool (optional; default=False)
 			option to mask posterior results
 
-		zcosmo : str (optional; default='zHD')
+		zcosmo : str or None (optional; default=None)
 			choice of whether cosmology redshift is flow-corrected zHD_hats or un-flow-corrected zcmb_hats
+			if None, set to self.zcosmo
+			if str, set as either 'zHD' or 'zcosmo'
 
 		alpha_zhel : bool (optional; default=False)
 			if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
@@ -1757,9 +1768,9 @@ class siblings_galaxy:
 		fig.axes[0].set_ylabel(r'Posterior Density',fontsize=self.FS)
 		fig.axes[0].set_xlabel(r'$\sigma_{\rm{Rel}}$ (mag)',fontsize=self.FS)#fig.text(0, 0.5, 'X', rotation=90, va='center', ha='center',color='white',fontsize=100)#fig.text(-0.06, 0.5, 'Posterior Density', rotation=90, va='center', ha='center',color='black',fontsize=self.FS)
 		pl.tick_params(labelsize=self.FS)
+		YMIN,YMAX = list(fig.axes[0].get_ylim())[:]
+		fig.axes[0].set_ylim([0,YMAX])
 		if self.save:
-			YMIN,YMAX = list(fig.axes[0].get_ylim())[:]
-			fig.axes[0].set_ylim([0,YMAX])
 			if leglabel!='':	pl.legend(loc='upper right',fontsize=self.FS-2,framealpha=1)
 			pl.tight_layout()
 			pl.savefig(f"{self.plotpath}{self.galname}_SigmaRelPosteriors.pdf",bbox_inches="tight")
@@ -1794,7 +1805,7 @@ class siblings_galaxy:
 		colors  = ['r','g','b']
 		mode_labels = [f"$\delta M$-{mode.capitalize()}" for mode in self.common_distance_estimates]
 		sig_labels  = [r'$\sigma_{\rm{Rel}}=\sigma_0$',
-					   r'$\sigma_{\rm{Rel}}\sim U(0,\sigma_0)$',
+					   r'$\rho \sim \rm{Arcsine}(0,1)$',#r'$\sigma_{\rm{Rel}}\sim U(0,\sigma_0)$',
 					   r'$\sigma_{\rm{Rel}}=0$']
 
 		mus  = np.array([self.common_distance_estimates[mode]['median'] for mode in self.common_distance_estimates])
@@ -1820,7 +1831,7 @@ class siblings_galaxy:
 								 xy=(deltas[nn]-mini_d*0.4475,ylow-dy*3),color='black',fontsize=self.FS)
 			fig.axes[0].annotate(sig_labels[nn],
 								 xy=(deltas[nn],yhigh),color='black',fontsize=self.FS,ha='center')
-		fig.axes[0].annotate(r'$\sigma_{\rm{Rel}}$ Priors:',
+		fig.axes[0].annotate(r'$\sigma_{\rm{Rel}}$-Hyperpriors:',
 							xy=(deltas[1]-mini_d*0,yhigh+dy*1.5),color='black',fontsize=self.FS+1,weight='bold',ha='center')
 		fig.axes[0].annotate(r'Common-$\mu$ Posteriors (mag):',
 							xy=(deltas[1]-mini_d*0,ylow-dy*1.5),color='black',fontsize=self.FS+1,weight='bold',ha='center')
