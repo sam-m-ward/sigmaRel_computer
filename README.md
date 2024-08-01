@@ -18,7 +18,7 @@ The default analysis pipeline is the `multi_galaxy` class, used for:
   3) Visualising individual photometric distances estimates, and Hubble diagrams.
      
 ### Single-galaxy Analysis
-Also included is the `siblings_galaxy` class for analysing a single siblings-galaxy, used for:
+This repo also includes the `siblings_galaxy` class for analysing a single siblings-galaxy, used for:
   1) ***Cosmology-independent analyses***, including computing/plotting posteriors for different choices of $\sigma_{\rm{Rel}}$ hyperprior.
   2) Computing a common-distance posterior by marginalising over $\sigma_{\rm{Rel}}$ with an informative hyperprior.
   3) Visualising individual photometric distance estimates.
