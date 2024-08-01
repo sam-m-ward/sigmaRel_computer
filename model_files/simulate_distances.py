@@ -98,7 +98,7 @@ class SiblingsDistanceSimulator:
 		#Empty pandas df
 		dfcolumns = ['Galaxy','SN','mus','mu_errs']
 		if external_distances:
-			dfcolumns += ['muext_hats','zcmb_hats','zcmb_errs']
+			dfcolumns += ['muext_zcmb_hats','zcmb_hats','zcmb_errs']
 		dfmus = pd.DataFrame(columns=dfcolumns)
 
 		#For each galaxy, simulate individual siblings distances, collate results into pandas df
@@ -114,7 +114,7 @@ class SiblingsDistanceSimulator:
 			mu   = self.cosmo.distmod(zHD).value + 5*np.log10((1+zhelio)/(1+zHD))
 			if external_distances:
 				zcmb_hat = np.random.normal(zcmb, zcmberr)#np.sqrt(np.square(zcmberr) + np.square(sigmapec/c_light)))
-				mu_ext   = self.cosmo.distmod(zcmb_hat).value
+				mu_ext   = self.cosmo.distmod(zcmb_hat).value#Simple estimate where we assume zcmb=zhelio
 
 			for s in range(self.Sg[g]):
 				counter +=1
