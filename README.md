@@ -5,6 +5,7 @@ Repo for Hierarchically Analysing Siblings Distance Estimates
 ---
 sigmaRel_computer is a modular Python+Stan pipeline for hierarchical Bayesian analysis of supernova siblings (supernovae that exploded in the same galaxy). Using photometric distance estimates to individual SN siblings, sigmaRel_computer can be used to perform a:
 * Cosmology-independent analysis: Compute a cosmology-independent posterior on the relative intrinsic scatter, $\sigma_{\rm{Rel}}$
+
 Additionally using redshift-based cosmology distances, sigmaRel_computer can be used to perform a:
 * Cosmology-dependent analysis: Compute a joint posterior on $\sigma_{\rm{Rel}}$ and the total intrinsic scatter, $\sigma_0$. 
 
