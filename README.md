@@ -13,15 +13,15 @@ The relative scatter, $\sigma_{\rm{Rel}}$ is the residual scatter of individual 
 
 ### Multi-galaxy Analysis
 The default analysis pipeline is the `multi_galaxy` class, used for:
-  1) The cosmology-independent analysis, including computing/plotting posteriors for different choices of $\sigma_{\rm{Rel}}$ hyperprior. 
-  2) The cosmology-dependent analysis, including computing/plotting posteriors for different assumptions about e.g. the intrinsic scatter hyperpriors, $\sigma_{\rm{pec}}$, and whether to model latent distance or redshift parameters.
-  3) Plotting photometric distances estimates and Hubble diagrams.
+  1) Cosmology-independent analyses, including computing/plotting posteriors for different choices of $\sigma_{\rm{Rel}}$ hyperprior. 
+  2) Cosmology-dependent analyses, including computing/plotting posteriors for different assumptions about e.g. the intrinsic scatter hyperpriors, $\sigma_{\rm{pec}}$, and whether to model latent distance or redshift parameters.
+  3) Visualising individual photometric distances estimates, and Hubble diagrams.
      
 ### Single-galaxy Analysis
 Also included is the `siblings_galaxy` class for analysing a single siblings-galaxy, used for:
-  1) The cosmology-independent analysis, including computing/plotting posteriors for different choices of $\sigma_{\rm{Rel}}$ hyperprior.
+  1) Cosmology-independent analyses, including computing/plotting posteriors for different choices of $\sigma_{\rm{Rel}}$ hyperprior.
   2) Computing a common-distance posterior by marginalising over $\sigma_{\rm{Rel}}$ with an informative hyperprior.
-  3) Plotting individual photometric distance estimates.
+  3) Visualising individual photometric distance estimates.
 
 ## Getting Started
 
