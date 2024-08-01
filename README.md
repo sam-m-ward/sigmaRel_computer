@@ -9,7 +9,7 @@ sigmaRel_computer is a modular Python+Stan pipeline for hierarchical Bayesian an
 Additionally using redshift-based cosmology distances, sigmaRel_computer can be used to perform a:
 * ***Cosmology-dependent analysis***: Compute a joint posterior on $\sigma_{\rm{Rel}}$ and the total intrinsic scatter, $\sigma_0$. 
 
-The relative scatter, $\sigma_{\rm{Rel}}$, is the residual scatter of individual siblings distance estimates relative to one another within a galaxy. It quantifies the contribution towards the total intrinsic scatter, $\sigma_0$, from within-galaxy variations about the siblings' common properties. Therefore, the contrast of $\sigma_{\rm{Rel}}$ with $\sigma_0$ indicates whether it is within-galaxy variations ($\sigma_{\rm{Rel}}\approx\sigma_0$), or the population variation of the siblings' common properties ($\sigma_{\rm{Rel}} \ll \sigma_0$) that contributes most towards the total intrinsic scatter in the Hubble diagram. 
+The relative scatter, $\sigma_{\rm{Rel}}$, is the residual scatter of individual siblings distance estimates relative to one another within a galaxy. It quantifies the contribution towards the total intrinsic scatter, $\sigma_0$, from within-galaxy variations about the siblings' common properties in each galaxy. Therefore, the contrast of $\sigma_{\rm{Rel}}$ with $\sigma_0$ indicates whether it is within-galaxy variations ($\sigma_{\rm{Rel}}\approx\sigma_0$), or the population variation of the siblings' common properties ($\sigma_{\rm{Rel}} \ll \sigma_0$) that contributes most towards the total intrinsic scatter in the Hubble diagram. 
 
 ### Multi-galaxy Analysis
 The default analysis pipeline is the `multi_galaxy` class, used for:
