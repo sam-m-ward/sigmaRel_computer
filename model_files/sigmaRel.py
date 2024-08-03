@@ -32,7 +32,7 @@ multi_galaxy class:
 
 
 siblings_galaxy class:
-	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,fontsize=18,show=False,save=True
+	inputs: mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,sigR_res=0.00025,fontsize=18,show=False,save=True
 
 	Methods are:
 		create_paths()
@@ -1330,7 +1330,7 @@ class siblings_galaxy:
 				if not os.path.exists(newpath):
 					os.mkdir(newpath)
 
-	def __init__(self,mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,Ngrid=1000,rootpath='./',fontsize=18,show=False,save=True):
+	def __init__(self,mus,errors,names,galname,prior_upper_bounds=[0.1,0.15,1.0],sigma0=0.094,sigR_res=0.00025,rootpath='./',fontsize=18,show=False,save=True):
 		"""
 		Initialisation
 
@@ -1354,8 +1354,10 @@ class siblings_galaxy:
 		sigma0 : float (optional; default=0.094~mag i.e. the W22 training value)
 			the total intrinsic scatter, i.e. informative prior upper bound on sigmaRel
 
-		Ngrid : int (optional; default=1000)
-			the number of sigmaRel grid points used in prior for computing posterior in range[0,prior_upper_bound]
+		#Ngrid : int (optional; default=1000)
+		#	the number of sigmaRel grid points used in prior for computing posterior in range[0,prior_upper_bound]
+		sigR_res : float (optional; default=0.00025)
+			the resolution in sigmaRel grid used in prior for computing posterior in range[0,prior_upper_bound]
 
 		rootpath : str
 			path/to/sigmaRel/rootpath
@@ -1375,7 +1377,8 @@ class siblings_galaxy:
 		self.galname = galname
 		self.prior_upper_bounds = prior_upper_bounds
 		self.sigma0   = sigma0
-		self.Ngrid    = Ngrid
+		#self.Ngrid   = Ngrid
+		self.sigR_res = sigR_res
 		self.rootpath = rootpath
 		self.FS       = fontsize
 		self.save     = save
@@ -1422,7 +1425,8 @@ class siblings_galaxy:
 		if prior_distribution!='uniform': raise Exception('Not yet implemented other prior distributions')
 
 		#Get prior grid and prior normalisation
-		self.sigRs      = np.linspace(0, prior_upper_bound, self.Ngrid)
+		#self.sigRs      = np.linspace(0, prior_upper_bound, self.Ngrid)
+		self.sigRs      = np.arange(0,prior_upper_bound+self.sigR_res,self.sigR_res)
 		self.prior_sigR = 1/prior_upper_bound
 
 		#Compute posterior
