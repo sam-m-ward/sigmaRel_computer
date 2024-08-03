@@ -110,10 +110,29 @@ for sigR,RHO in zip(df_vals.sigmaRel.values,df_vals.rho.values):
 	FITS = trim_to_KEEPERS({'dummy':FITS},get_KEEPERS({'dummy':FITS},Nsim_keep,Rhat_threshold,loop_par,dfpars[loop_par]))['dummy']
 	GLOB_FITS[RHO] = FITS
 
-#Plot SBC
+###Plot SBC
+#Plot of recovery of args['looppar']
+fig,axs = pl.subplots(len(GLOB_FITS),1,figsize=(8,6*len(GLOB_FITS)),sharex=False)
+for iax,true_rho in enumerate(GLOB_FITS):
+	FITS      = GLOB_FITS[true_rho]
+	sap,Ncred = get_sap_Ncred(loop_par,true_rho,ALT_PRIOR)
+	true_par  = round(df_vals[df_vals.rho==true_rho][loop_par].values[0],3)
+	plotter   = SBC_FITS_PLOTTER(iax,fig.axes,[true_par,loop_par,dfpars[loop_par],parlabels[loop_par]],FITS,bounds,rootpath,quantilemode=args['quantilemode'])
+	plotter.plot_sbc_panel(sap=sap, Ncred = Ncred, Lside = True if ('_rat' in loop_par and true_rho==0.5) else False,FAC = 25)
+fig.axes[0].set_title('Fits to %s$\\times$%s simulations of %s sibling-pair galaxies;\nTrue $\sigma_0 = %s\,$mag;\nHyperpriors: %s'%(df_vals.shape[0],Nsim_keep,Ng,sim_sigma0,' ; '.join(hyperprior_lines)),fontsize=plotter.FS)
+fig.axes[-1].set_xlabel(r'%s'%parlabels_full[loop_par],fontsize=plotter.FS)
+fig.axes[0].set_ylabel('Posterior Densities',fontsize=plotter.FS,color='white')#For spacing
+fig.text(0.01, 0.5, 'Posterior Densities', ha='center', va='center', rotation='vertical',fontsize=plotter.FS)
+pl.tight_layout()
+if args['save']:#savekey   = f'multigalsims_{samplename}_Modelsigma0{sigma0}'
+	pl.savefig(f"{plotpath}SBC_looppar{loop_par}_quantilemode{args['quantilemode']}_hyperprior{ALT_PRIOR}.pdf",bbox_inches='tight')
+if args['show']:
+	pl.show()
+
+
+#Plot of simulation averaged posteriors of pars listed below
 pars = ['rho','sigmaRel','sigmaCommon','sigma0']
 pars = ['rho','rel_rat','com_rat']
-
 GFITS = {key:value for key,value in GLOB_FITS.items() if key in [1,0]}
 fig,axs = pl.subplots(len(GFITS),len(pars),figsize=(8*len(pars),6*len(GFITS)),sharex=False)
 counter=-1
@@ -139,24 +158,5 @@ fig.text(0.1, 0.5, 'Posterior Densities', ha='center', va='center', rotation='ve
 fig.subplots_adjust(wspace=0.08,hspace=0.08)
 if args['save']:
 	pl.savefig(f"{plotpath}SBC_{'.'.join(pars)}.pdf",bbox_inches='tight')
-if args['show']:
-	pl.show()
-err=1/0
-
-
-fig,axs = pl.subplots(len(GLOB_FITS),1,figsize=(8,6*len(GLOB_FITS)),sharex=False)
-for iax,true_rho in enumerate(GLOB_FITS):
-	FITS      = GLOB_FITS[true_rho]
-	sap,Ncred = get_sap_Ncred(loop_par,true_rho,ALT_PRIOR)
-	true_par  = round(df_vals[df_vals.rho==true_rho][loop_par].values[0],3)
-	plotter   = SBC_FITS_PLOTTER(iax,fig.axes,[true_par,loop_par,dfpars[loop_par],parlabels[loop_par]],FITS,bounds,rootpath,quantilemode=args['quantilemode'])
-	plotter.plot_sbc_panel(sap=sap, Ncred = Ncred, Lside = True if ('_rat' in loop_par and true_rho==0.5) else False,FAC = 25)
-fig.axes[0].set_title('Fits to %s$\\times$%s simulations of %s sibling-pair galaxies;\nTrue $\sigma_0 = %s\,$mag;\nHyperpriors: %s'%(df_vals.shape[0],Nsim_keep,Ng,sim_sigma0,' ; '.join(hyperprior_lines)),fontsize=plotter.FS)
-fig.axes[-1].set_xlabel(r'%s'%parlabels_full[loop_par],fontsize=plotter.FS)
-fig.axes[0].set_ylabel('Posterior Densities',fontsize=plotter.FS,color='white')#For spacing
-fig.text(0.01, 0.5, 'Posterior Densities', ha='center', va='center', rotation='vertical',fontsize=plotter.FS)
-pl.tight_layout()
-if args['save']:#savekey   = f'multigalsims_{samplename}_Modelsigma0{sigma0}'
-	pl.savefig(f"{plotpath}SBC_looppar{loop_par}_quantilemode{args['quantilemode']}_hyperprior{ALT_PRIOR}.pdf",bbox_inches='tight')
 if args['show']:
 	pl.show()
