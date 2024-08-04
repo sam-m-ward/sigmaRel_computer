@@ -28,7 +28,7 @@ import pickle
 import json, os
 import arviz as az
 from cmdstanpy import CmdStanModel
-from plotting_script import *
+from .plotting_script import *
 
 
 class ResModelLoader:

@@ -55,8 +55,8 @@ from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
 import copy, os, pickle, re
-from model_loader_script import *
-from plotting_script import *
+from .model_loader_script import *
+from .plotting_script import *
 from astropy.cosmology import FlatLambdaCDM
 from matplotlib import container
 
