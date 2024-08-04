@@ -309,7 +309,7 @@ class multi_galaxy_siblings:
 		self.productpath  = self.rootpath  + 'products/multigal/'
 		self.plotpath     = self.rootpath  + 'plots/multi_galaxy_plots/'
 		self.create_paths()
-		shutil.copytree(self.packagepath+'stan_files', self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
+		shutil.copytree(os.path.join(self.packagepath,'stan_files'), self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
 
 		#Posterior Configuration
 		self.n_warmup   = 1000
