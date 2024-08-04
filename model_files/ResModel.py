@@ -25,7 +25,8 @@ Written by Sam M. Ward: smw92@cam.ac.uk
 """
 import arviz as az
 from cmdstanpy import CmdStanModel
-import json, os, pickle
+import json, os, pickle, sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 from plotting_script import *
 

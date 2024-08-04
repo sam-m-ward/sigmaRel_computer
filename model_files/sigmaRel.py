@@ -54,7 +54,8 @@ import arviz as az
 from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
-import copy, os, pickle, re
+import copy, os, pickle, re, sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from model_loader_script import *
 from plotting_script import *
 from astropy.cosmology import FlatLambdaCDM
