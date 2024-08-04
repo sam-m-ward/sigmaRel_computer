@@ -54,7 +54,7 @@ import arviz as az
 from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
-import copy, os, pickle, re, sys
+import copy, os, pickle, re, shutil, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from model_loader_script import *
 from plotting_script import *
@@ -302,12 +302,14 @@ class multi_galaxy_siblings:
 		self.zcosmo			        = zcosmo
 
 		#Paths
-		self.rootpath    = rootpath #The project rootpath
-		self.modelpath   = os.path.dirname(os.path.abspath(__file__))#The package path	#self.modelpath   = self.rootpath  + 'model_files/'
-		self.stanpath    = os.path.join(self.modelpath,'stan_files/MultiGalFiles/')
-		self.productpath = self.rootpath  + 'products/multigal/'
-		self.plotpath    = self.rootpath  + 'plots/multi_galaxy_plots/'
+		self.packagepath  = os.path.dirname(os.path.abspath(__file__))#The package path
+		self.rootpath     = rootpath  #The project rootpath
+		self.modelpath    = self.rootpath  + 'model_files/' #Where model_files will be stored (copied to from package)
+		self.stanpath     = self.modelpath + 'stan_files/MultiGalFiles/'
+		self.productpath  = self.rootpath  + 'products/multigal/'
+		self.plotpath     = self.rootpath  + 'plots/multi_galaxy_plots/'
 		self.create_paths()
+		shutil.copytree(self.packagepath+'stan_files/', self.modelpath+'stan_files/')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
 
 		#Posterior Configuration
 		self.n_warmup   = 1000
