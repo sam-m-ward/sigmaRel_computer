@@ -54,9 +54,10 @@ import arviz as az
 from cmdstanpy import CmdStanModel
 import matplotlib.pyplot as pl
 import numpy as np
-import copy, os, pickle, re
-from .model_loader_script import *
-from .plotting_script import *
+import copy, os, pickle, re, sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from model_loader_script import *
+from plotting_script import *
 from astropy.cosmology import FlatLambdaCDM
 from matplotlib import container
 
@@ -301,8 +302,8 @@ class multi_galaxy_siblings:
 		self.zcosmo			        = zcosmo
 
 		#Paths
-		self.rootpath    = rootpath
-		self.modelpath   = self.rootpath  + 'model_files/'
+		self.rootpath    = rootpath #The project rootpath
+		self.modelpath   = os.path.dirname(os.path.abspath(__file__))#The package path	#self.modelpath   = self.rootpath  + 'model_files/'
 		self.stanpath    = self.modelpath + 'stan_files/MultiGalFiles/'
 		self.productpath = self.rootpath  + 'products/multigal/'
 		self.plotpath    = self.rootpath  + 'plots/multi_galaxy_plots/'

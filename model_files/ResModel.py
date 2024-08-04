@@ -23,12 +23,12 @@ ResModelLoader class:
 
 Written by Sam M. Ward: smw92@cam.ac.uk
 """
-import numpy as np
-import pickle
-import json, os
 import arviz as az
 from cmdstanpy import CmdStanModel
-from .plotting_script import *
+import json, os, pickle, sys
+import numpy as np
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from plotting_script import *
 
 
 class ResModelLoader:
