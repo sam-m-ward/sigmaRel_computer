@@ -309,7 +309,11 @@ class multi_galaxy_siblings:
 		self.productpath  = self.rootpath  + 'products/multigal/'
 		self.plotpath     = self.rootpath  + 'plots/multi_galaxy_plots/'
 		self.create_paths()
-		shutil.copytree(os.path.join(self.packagepath,'stan_files'), self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
+		try:
+			shutil.copytree(os.path.join(self.packagepath,'stan_files'), self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
+		except:
+			print (f"Tried copying stan_files folder from :{os.path.join(self.packagepath,'stan_files')} to {self.modelpath+'stan_files'}")
+			print ("But the latter folder already exists.")
 
 		#Posterior Configuration
 		self.n_warmup   = 1000
