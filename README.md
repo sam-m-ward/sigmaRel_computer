@@ -27,6 +27,8 @@ This repo also includes the `siblings_galaxy` class for analysing a single sibli
 
 Check out [**installation_instructions.md**](https://github.com/sam-m-ward/sigmaRel_computer/blob/main/installation_instructions.md) to clone the repo and set up a conda environment.
 
+Alternatively see [**pip_installation_instructions.md**](https://github.com/sam-m-ward/sigmaRel_computer/blob/main/pip_installation_instructions.md) to `pip install sigmaRel-computer` in a custom conda environment.
+
 See [**tutorial.ipynb**](https://github.com/sam-m-ward/sigmaRel_computer/blob/main/tutorial.ipynb) for a quick introduction to sigmaRel_computer.
 
 ## Example Use
