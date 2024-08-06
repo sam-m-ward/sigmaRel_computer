@@ -1,4 +1,4 @@
-# Instructions for sigmaRel_computer installation
+# Instructions for sigmaRel_computer `pip` installation
 
 ### 1) Create/activate new `(sigmaRel)` conda environment, built on cmdstanpy version 1.0.0
 
