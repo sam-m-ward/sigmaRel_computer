@@ -18,7 +18,7 @@ ResModelLoader class:
 		prepare_stan()
 		get_parlabels()
 		get_modelkey()
-		sample_posterior(alpha=False,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, beta=None, overwrite=True)
+		sample_posterior(alpha=False,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigRel_prior=1, beta=None, overwrite=True)
 		get_parlabels()
 		plot_posterior_samples(FS=None,paperstyle=True,quick=True,save=True,show=False, returner=False)
 --------------------
@@ -307,13 +307,14 @@ class ResModelLoader:
 		----------
 		stan_data dictionary
 		"""
-		Nd   = self.dfmus.shape[0]
+		Ns   = self.dfmus.shape[0]
 		Nf   = len(self.pxs)
-		Y    = self.dfmus[f'{self.py}_respoint'].to_numpy()
-		Yerr = self.dfmus[f'{self.py}_reserr'].to_numpy()
-		X    = self.dfmus[[f'{px}_respoint' for px in self.pxs]].to_numpy()
-		Xerr = self.dfmus[[f'{px}_reserr' for px in self.pxs]].to_numpy()
-
+		Ng   = self.dfmus['Galaxy'].nunique()
+		S_g  = self.dfmus.groupby('Galaxy',sort=False)['SN'].agg('count').values
+		X    = self.dfmus[[f'{px}s' for px in self.pxs]].to_numpy()
+		Xerr = self.dfmus[[f'{px}_errs' for px in self.pxs]].to_numpy()
+		Y    = self.dfmus[f'{self.py}s'].to_numpy()
+		Yerr = self.dfmus[f'{self.py}_errs'].to_numpy()
 
 		'''#Simulated data for testing stan model
 		Nd     = 100
@@ -329,8 +330,8 @@ class ResModelLoader:
 		#'''
 
 		stan_data = dict(zip(
-			['Nd','Nf','Y','Yerr','X','Xerr','beta_prior','sigint_prior'],
-			[ Nd , Nf , Y , Yerr , X , Xerr , self.beta_prior , self.sigint_prior ]
+			['Ns','Nf','Ng','S_g','X','Xerr','Y','Yerr','beta_prior','sigRel_prior'],
+			[ Ns , Nf , Ng , S_g , X , Xerr , Y , Yerr , self.beta_prior , self.sigRel_prior ]
 		))
 		if self.alpha:#Typically set intercept to zero for residuals
 			stan_data['alpha_prior'] = self.alpha_prior
@@ -352,7 +353,14 @@ class ResModelLoader:
 		----------
 		list of json files with initialisations that cmdstan can read
 		"""
-		json_file = {**{'alpha':0,'sigint':1e-6}, **{f'beta[{_+1}]':0 for _ in range(len(self.pxs))}}
+		#json_file = {**{'alpha':0,'sigmaRel':1e-6}, **{f'beta[{_+1}]':0 for _ in range(len(self.pxs))}}
+		#json_file = {**{'etaalpha':0.5}, **{f'etabeta[{_+1}]':0.5 for _ in range(len(self.pxs))}}
+		json_file = {	**{f'y[{isn+1}]':y for isn,y in enumerate(self.dfmus[f'{self.py}s'].values)},
+						**{f'mu_g[{ig+1}]':self.dfmus[self.dfmus['Galaxy']==g][f'{self.py}_respoint'].values[0] for ig,g in enumerate(self.dfmus['Galaxy'].unique())}
+					}
+		for ff,px in enumerate(self.pxs):
+			json_file = {**json_file, **{f'x[{isn+1},{ff+1}]':x for isn,x in enumerate(self.dfmus[f'{px}s'].values)}}
+
 		with open(f"{self.productpath}inits.json", "w") as f:
 			json.dump(json_file, f)
 
@@ -393,7 +401,7 @@ class ResModelLoader:
 			the parameter names used/saved in model
 		"""
 		pars  = [f'beta[{_+1}]' for _ in range(len(self.pxs))]
-		pars += ['sigint','alpha'] + ['sigmaRel']
+		pars += ['sigmaRel','alpha']
 		if self.alpha is False:
 			pars.remove('alpha')
 		if self.beta is not None:
@@ -429,7 +437,7 @@ class ResModelLoader:
 		print ('###'*10)
 		self.filename = f"FIT{self.modelkey}.pkl"
 
-	def sample_posterior(self,alpha=False,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, beta=None, overwrite=True):
+	def sample_posterior(self,alpha=False,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigRel_prior=1, beta=None, overwrite=True):
 		"""
 		Sample Posterior
 
@@ -443,7 +451,7 @@ class ResModelLoader:
 		py, pxs : str, list of str (optional; default='mu', ['theta'])
 			predictor and features for multiple linear regression
 
-		alpha_prior, beta_prior, sigint_prior : floats (optional; default=10,10,10)
+		alpha_prior, beta_prior, sigRel_prior : floats (optional; default=10,10,1)
 			width of normal prior on hyperparameters, if alpha is None alpha_prior is set to 1e-6
 
 		beta : None or list of floats (optional; default is None)
@@ -461,7 +469,7 @@ class ResModelLoader:
 		self.beta  = beta
 		self.py    = py
 		self.pxs   = pxs
-		self.alpha_prior,self.beta_prior,self.sigint_prior = alpha_prior,beta_prior,sigint_prior
+		self.alpha_prior,self.beta_prior,self.sigRel_prior = alpha_prior,beta_prior,sigRel_prior
 		self.get_modelkey()
 
 		#If files don't exist or overwrite, do stan fits
@@ -521,11 +529,11 @@ class ResModelLoader:
 		parnames are names in data, dfparnames are names in model, parlabels are those for plotting, bounds are hard prior bounds on parameters for reflection KDEs
 		"""
 		#Initialisation
-		parnames   = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + ['sigint','sigmaRel','alpha']
-		dfparnames = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + ['sigint','sigmaRel','alpha']
-		pxdict     = {'theta':'\\theta','etaAV':'\\eta_{A_V}'}
-		parlabels  = ['$\\beta_{%s}$'%(pxdict[px]) for px in self.pxs] + ['$\\sigma_{\\rm{int}}$','$\\sigma_{\\rm{Rel}}$','$\\alpha$']
-		bounds     = [[None,None] for _ in range(len(self.pxs))] + [[0,None],[0,None],[None,None]]
+		parnames   = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + ['sigmaRel','alpha']
+		dfparnames = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + ['sigmaRel','alpha']
+		pxdict     = {'theta':'\\theta','AV':'A_{V}','etaAV':'\\eta_{A_V}'}
+		parlabels  = ['$\\beta_{%s}$'%(pxdict[px]) for px in self.pxs] + ['$\\sigma_{\\rm{Rel}}$','$\\alpha$']
+		bounds     = [[None,None] for _ in range(len(self.pxs))] + [[0,None],[None,None]]
 
 		#Filter on pars
 		PARS  = pd.DataFrame(data=dict(zip(['dfparnames','parlabels','bounds'],[dfparnames,parlabels,bounds])),index=parnames)
