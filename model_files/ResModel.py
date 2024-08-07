@@ -10,7 +10,9 @@ ResModelLoader class:
 	inputs: dfmus,rootpath='./',FS=18,verbose=True
 
 	Methods are:
-		plot_res(p1='theta',p2='mu',show=False,save=True)
+		plot_res_pairs(px='theta',py='mu',show=False,save=True)
+		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
+		plot_res(px='theta',py='mu',zerox=True,zeroy=True,show=False,save=True,markersize=10,capsize=2,alpha=0.9,elw=1.5,mew=1.5,text_index=3,annotate_mode=False)
 		get_data()
 		get_inits()
 		prepare_stan()
@@ -25,10 +27,11 @@ Written by Sam M. Ward: smw92@cam.ac.uk
 """
 import arviz as az
 from cmdstanpy import CmdStanModel
-import json, os, pickle, sys
+import json, os, pickle, re, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 from plotting_script import *
+from matplotlib import container
 
 
 class ResModelLoader:
@@ -59,7 +62,7 @@ class ResModelLoader:
 
 		self.FS = FS
 
-		#Create res samples for plotting
+		#Create residual samples
 		self.PARS = [par for par in ['mu','AV','theta','RV','etaAV'] if f'{par}_samps' in self.dfmus.columns]
 		def mean_mapper(x):
 			mean_samps = x.mean(axis=0)
@@ -69,7 +72,6 @@ class ResModelLoader:
 			self.dfmus[f'{PAR}res_samps'] = self.dfmus.groupby('Galaxy')[f'{PAR}_samps'].transform(lambda x: mean_mapper(x))
 			self.dfmus[f'{PAR}_respoint'] = self.dfmus[f'{PAR}res_samps'].apply(np.median)
 			self.dfmus[f'{PAR}_reserr']   = self.dfmus[f'{PAR}res_samps'].apply(np.std)
-		self.dfmus = self.dfmus.iloc[::2].copy()
 		print (self.dfmus[[col for col in dfmus.columns if 'respoint' in col or 'reserr' in col] + ['Galaxy']])
 
 		#Input Posterior Parameters
@@ -83,15 +85,15 @@ class ResModelLoader:
 		self.n_chains   = 4
 		self.n_thin     = 1000
 
-	def plot_res(self,p1='theta',p2='mu',show=False,save=True):
+	def plot_res_pairs(self,px='theta',py='mu',show=False,save=True):
 		"""
-		Plot Residuals
+		Plot Residuals for Sibling Pairs
 
 		Plots the residuals of two parameters against one another
 
 		Parameters
 		----------
-		p1,p2 : strs (optional; default='theta', 'mu')
+		px,py : strs (optional; default='theta', 'mu')
 			the x and y parameters, respectively
 
 		show, save: bools (optional; default=False,True)
@@ -102,22 +104,196 @@ class ResModelLoader:
 		Plot of residuals
 		"""
 		dfmus = self.dfmus.copy()
+		dfmus = dfmus.iloc[::2].copy()
 		colours = [f'C{s%10}' for s in range(dfmus['Galaxy'].nunique())]
 		markers = ['o','s','p','^','x','P','d','*']
 		markers = [markers[int(ig%len(markers))] for ig in range(dfmus['Galaxy'].nunique())]
 		pl.figure()
 		for ig,g in enumerate(dfmus['Galaxy'].unique()):
-			z1m = dfmus[dfmus['Galaxy']==g][f'{p1}res_samps'].apply(np.median)
-			z2m = dfmus[dfmus['Galaxy']==g][f'{p2}res_samps'].apply(np.median)
-			z1e = dfmus[dfmus['Galaxy']==g][f'{p1}res_samps'].apply(np.std)
-			z2e = dfmus[dfmus['Galaxy']==g][f'{p2}res_samps'].apply(np.std)
-			pl.errorbar(z1m,z2m,z1e,z2e,linestyle='none',marker=markers[ig],color=colours[ig])
-		pl.xlabel(self.master_parlabels[self.master_parnames.index(p1)], fontsize=self.FS)
-		pl.ylabel(self.master_parlabels[self.master_parnames.index(p2)], fontsize=self.FS)
+			xm = dfmus[dfmus['Galaxy']==g][f'{px}res_samps'].apply(np.median)
+			ym = dfmus[dfmus['Galaxy']==g][f'{py}res_samps'].apply(np.median)
+			xe = dfmus[dfmus['Galaxy']==g][f'{px}res_samps'].apply(np.std)
+			ye = dfmus[dfmus['Galaxy']==g][f'{py}res_samps'].apply(np.std)
+			#if z1m.values[0]<0: z1m *= -1; z2m *= -1
+			pl.errorbar(xm,ym,xe,ye,linestyle='none',marker=markers[ig],color=colours[ig])
+		pl.xlabel(self.master_parlabels[self.master_parnames.index(px)], fontsize=self.FS)
+		pl.ylabel(self.master_parlabels[self.master_parnames.index(py)], fontsize=self.FS)
 		pl.tight_layout()
 		pl.tick_params(labelsize=self.FS)
 		if save:
-			pl.savefig(self.plotpath+f'resplot_{p1}_{p2}.pdf',bbox_inches="tight")
+			pl.savefig(self.plotpath+f'respairplot_{px}_{py}.pdf',bbox_inches="tight")
+		if show:
+			pl.show()
+
+	def print_table(self, PARS=['mu','AV','theta','RV'],verbose=False,returner=False):
+		"""
+		Print Tables
+
+		Method to take posterior chains and print summaries
+
+		Parameters
+		----------
+		PARS: list (optional; default=['mu','AV','theta','RV'])
+			total list that is then trimmed to match that in dfmus
+
+		verbose : bool (optional; default=False)
+			option to print out summaries for each plot
+
+		returner: bool (optional; default=False)
+			if True, return list of summaries
+
+		End Product(s)
+		----------
+		Prints out string
+		"""
+		all_PARS   = copy.deepcopy(PARS)
+		pPARS      = ['mu','AV','theta','RV']
+		pars       = [p for p in self.master_parnames if p in PARS]
+		samp_cols  = [f'{p}_samps' for p in pars if f'{p}_samps' in self.dfmus.columns]
+
+		keep        = [i for i,p in enumerate(self.master_parnames) if p in pars]
+		parlabels   = [x for i,x in enumerate(self.master_parlabels) if i in keep]
+		bounds      = [x for i,x in enumerate(self.master_bounds)    if i in keep]
+
+		plotting_parameters = {'FS':self.FS,'paperstyle':False,'quick':True,'save':False,'show':False}
+		lines = [] ; old_g = self.dfmus['Galaxy'].iloc[0]
+		for isn,sn in enumerate(self.dfmus.index):
+			NSN_g = str(self.dfmus[self.dfmus.Galaxy==self.dfmus.Galaxy.loc[sn]].shape[0])
+			if self.dfmus['Galaxy'].loc[sn]!=old_g:
+				lines.append('\midrule')
+				old_g = self.dfmus['Galaxy'].loc[sn]
+				new_g = True
+			else:
+				new_g = False if isn!=0 else True
+			try:
+				samples = {par:self.dfmus[samp_col].loc[sn] for par,samp_col in zip(pars,samp_cols)}
+				try:	Rhats   = {par:self.dfmus[f'{par}_Rhats'].loc[sn] for par in pars}
+				except:	Rhats   = {par:-1.0 for par in pars}
+				postplot = POSTERIOR_PLOTTER(samples, pars, parlabels, bounds, Rhats, plotting_parameters)
+				Summary_Strs = postplot.corner_plot(verbose=verbose)#Table Summary
+			except:
+				Summary_Strs = {par:f"${self.dfmus[f'{par}s'].loc[sn]:.2f}\pm{self.dfmus[f'{par}_errs'].loc[sn]:.2f}$" for par in pars}
+			#Create Line
+			line = self.dfmus['SN'].loc[sn].replace('_','\_') + ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,self.dfmus['Galaxy'].loc[sn].astype(str)) if new_g else '')
+			for par in all_PARS:
+				if par in pars:
+					line += ' & ' + Summary_Strs[par]
+				elif par not in pars and par not in pPARS:
+					if par in ['zcmb_hats','zHD_hats']:
+						line += ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,str(round(self.dfmus[par].loc[sn],6))) if new_g else '')#int(-np.log10(self.dfmus['zhelio_errs'].loc[sn]))))
+					elif par in ['cosmo_sample']:
+						mark  = {True:"\\cmark",False:"\\xmark"}[self.dfmus[par].loc[sn]]
+						line += ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,{True:"\\cmark",False:"\\xmark"}[self.dfmus[par].loc[sn]]) if new_g else '')
+					else:
+						line += ' & ' + (r"\multirow{%s}{*}{%s}"%(NSN_g,self.dfmus[par].astype(str).loc[sn]) if new_g else '')
+			line +=  ' \\\\ '
+			lines.append(line)
+		if returner:
+			return lines
+		else:
+			print ('\n'.join(lines))
+
+	def plot_res(self,px='theta',py='mu',zerox=True,zeroy=True,show=False,save=True,markersize=10,capsize=2,alpha=0.9,elw=1.5,mew=1.5,text_index=3,annotate_mode=False):
+		"""
+		Plot Residuals
+
+		Plots the residuals of two parameters against one another
+
+		Parameters
+		----------
+		px,py : strs (optional; default='theta', 'mu')
+			the x and y parameters, respectively
+
+		zerox,zeroy : bools (optional; default=True,True)
+			choice to subtract off galaxy mean
+
+		show, save: bools (optional; default=False,True)
+			whether to show/save plot
+
+		markersize,capsize,alpha,elw,mew: float,float,bool,foat (optional;default=14,5,0.9,3,3)
+			size of markers and cap., alpha, elinewidth and markeredgewidth
+
+		text_index, annotate_mode: int, str (optional; default=3, 'legend' or 'text')
+			for example if 'ZTF18abcxyz', specifying 3 returns label '18abcxyz'
+			if legend annotate, put SN names in legend, otherwise, put SN name next to data points
+
+		End Product
+		----------
+		Plot of residuals
+		"""
+		dfmus   = self.dfmus.copy()
+		colours = [f'C{s%10}' for s in range(dfmus['Galaxy'].nunique())]
+		markers = ['o','s','p','^','x','P','d','*']
+		markers = [markers[int(ig%len(markers))] for ig in range(dfmus['Galaxy'].nunique())]
+		PARS    = [px,py]
+
+		#Chromatic parameter posteriors bunching up
+		if [pp for pp in ['AV','RV'] if pp in PARS]!=[]:#To get 68,95 intervals when required
+			PPARS = [pp for pp in ['AV','RV'] if pp in PARS]
+			lines = self.print_table(PARS=PPARS,returner=True)
+			lines = [ll.split('\\\\')[0] for ll in lines if ll!='\\midrule']
+			dfsummaries = pd.DataFrame([re.sub(r'\s+','',ll).split('&') for ll in lines],columns=['SN','GalaxyID']+PPARS)
+			dfsummaries['SN'] = dfsummaries['SN'].apply(lambda x: x.replace('\_','_'))
+			dfsummaries[[f'{pp}bunched' for pp in PPARS]] = dfsummaries[PPARS].apply(lambda x: ['\pm' not in xi for xi in x],axis=1,result_type='expand')
+			for pp in PPARS:
+				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}68'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: x.split('(')[0].split('$')[1][1:])
+				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}95'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: x.split('(')[1].split(')')[0])
+				dfsummaries.loc[dfsummaries[f'{pp}bunched'],f'{pp}bunchindex'] = dfsummaries.loc[dfsummaries[f'{pp}bunched'],pp].apply(lambda x: {'<':0,'>':1}[x[1]])
+		else:
+			dfsummaries = pd.DataFrame()
+
+		#Axis labels
+		def get_axlab(pz,zeroz):
+			if pz=='mu':		zlabel = r"$\hat{\mu}_s - \overline{\hat{\mu}_s}$ (mag)"  if zeroz else r"$\hat{\mu}_s$ (mag)"	;	pword = 'Distance'
+			if pz=='AV':		zlabel = r"$\hat{A}^s_V - \overline{\hat{A}^s_V}$ (mag)"  if zeroz else r"$\hat{A}^s_V$ (mag)"	;	pword = 'Dust Extinction'
+			if pz=='RV':		zlabel = r"$\hat{R}^s_V - \overline{\hat{R}^s_V}$" 		  if zeroz else r"$\hat{R}^s_V$"		;	pword = 'Dust Law Shape'
+			if pz=='theta':		zlabel = r"$\hat{\theta}_s - \overline{\hat{\theta}_s}$"  if zeroz else r"$\hat{\theta}_s$"		;	pword = 'Light Curve Shape'
+			if pz=='etaAV':		zlabel = r"$\hat{\eta}^s_{A_V} - \overline{\hat{\eta}^s_{A_V}}$ (mag)" if zeroz else r"$\hat{\eta}^s_{A_V}$ (mag)"	;	pword = 'Repar. Dust Extinction'
+			return zlabel
+		xlabel = get_axlab(px,zerox)
+		ylabel = get_axlab(py,zeroy)
+
+		#Get parameter estimates, zeroed by point estimate of average, and/or with posterior bunching up at bound
+		def get_zs(pz,zeroz,dfgal,dfsummaries,SNe):
+			zs,zerrs = dfgal[f'{pz}s'].values,dfgal[f'{pz}_errs'].tolist()
+			if zeroz:	zs += - np.average(zs)
+			for isn,sn in enumerate(SNe):
+				if pz in ['AV','RV'] and dfsummaries[dfsummaries['SN']==sn][f'{pz}bunched'].values[0]:
+					bunchindex  = int(dfsummaries[dfsummaries['SN']==sn][f'{pz}bunchindex'].values[0])
+					point       = self.master_bounds[self.master_parnames.index(pz)][bunchindex]
+					e68         = float(dfsummaries[dfsummaries['SN']==sn][f'{pz}68'].values[0])
+					zerrs[isn] = [[e68*bunchindex],[e68*(1-bunchindex)]]
+			return zs, zerrs
+
+		fig = pl.figure()
+		#For each galaxy, plot distances
+		for igal,gal in enumerate(self.dfmus['Galaxy'].unique()):
+			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
+			SNe      = dfgal['SN'].values
+			xs,xerrs = get_zs(px,zerox,dfgal,dfsummaries,SNe)
+			ys,yerrs = get_zs(py,zeroy,dfgal,dfsummaries,SNe)
+			#For each SN
+			for x,xerr,y,yerr,ss in zip(xs,xerrs,ys,yerrs,np.arange(dfgal.shape[0])):
+				#Choice of labelling for legend/SNe
+				lab = '\n'.join([sn[text_index:] for sn in SNe])
+				lab = lab if ss==0 and annotate_mode=='legend' else None
+
+				pl.errorbar(x,y,xerr=xerr,yerr=yerr,
+					color=colours[igal],marker=markers[igal],markersize=markersize,alpha=alpha,elinewidth=elw,markeredgewidth=mew,linestyle='none',capsize=capsize, label=lab)
+
+		#Legend (needs work)
+		if annotate_mode=='legend':
+			args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
+			lines, labels = fig.axes[-1].get_legend_handles_labels()
+			lines = [h[0] if isinstance(h, container.ErrorbarContainer) else h for h in lines]
+			fig.axes[0].legend(lines,labels,fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
+
+		pl.xlabel(xlabel, fontsize=self.FS)
+		pl.ylabel(ylabel, fontsize=self.FS)
+		pl.tight_layout()
+		pl.tick_params(labelsize=self.FS)
+		if save:
+			pl.savefig(self.plotpath+f"resplot_{px}{'nozero' if not zerox else ''}_{py}{'nozero' if not zeroy else ''}.pdf",bbox_inches="tight")
 		if show:
 			pl.show()
 
