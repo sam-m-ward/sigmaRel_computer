@@ -20,7 +20,8 @@ from simulate_distances import *
 
 #SBC settings
 Nsim_keep = 100
-Ng = 100 ; Sg = 2 ; RS=100
+Ng = 100 ; Sg = 2 ; RS=100 ; sigma_fit_s = 0.05 ; ssigma0 = 0.1
+#sigma_fit_s = 0.1 ; ssigma0=0.15
 zcosmo = 'zcmb'
 sigma0 = 'free'
 Rhat_threshold = 1.02 ; Ntrials=10
@@ -46,10 +47,10 @@ if ALT_PRIOR == 'C': 	hyperprior_lines = [r"$\sigma_{0} \sim U(0,1)$", r"$\rho \
 #Perform SBC
 productpath = None; plotpath = None; modelkey  = None; sim_sigma0 = None
 for rs in np.arange(RS):
-	for sigR,RHO in zip([0,0.1/((2)**0.5),0.1],[1,0.5,0]):
+	for sigR,RHO in zip([0,ssigma0/((2)**0.5),ssigma0],[1,0.5,0]):
 		try:
 			if modelkey is not None and overwrite is False:
-				samplename = f'Ng{Ng}_Sg{Sg}_Rs{rs}_Truesigma0{sim_sigma0}_TruesigmaRel{round(sigR,3)}'
+				samplename = f'Ng{Ng}_Sg{Sg}_Rs{rs}_Truesigma0{sim_sigma0}_TruesigmaRel{round(sigR,3)}'+(sim_sigmafit!=0.05)*f'_sigmafit{sim_sigmafit}'
 				filename   = productpath+f"FIT{samplename}{modelkey}.pkl"
 				if os.path.exists(filename):
 					pass
@@ -61,12 +62,12 @@ for rs in np.arange(RS):
 			print ((('#~#~#'*30)+'\n')*3)
 			print (f'Performing: random_state={rs}/{RS}; sigR={sigR} equiv rho={RHO}')
 			print ('\n'+(('#-#-#'*30)+'\n')*3)
-			simulator  = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=sigR,zcmberr=1e-5,random=42+rs)
+			simulator  = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=sigR,zcmberr=1e-5,random=42+rs,sigma_fit_s=sigma_fit_s,sigma0=ssigma0)
 			dfmus     = simulator.dfmus
 			dfmus['zhelio_hats'] = dfmus['zcmb_hats']
 			dfmus['zhelio_errs'] = dfmus['zcmb_errs']
 
-			samplename = f'Ng{Ng}_Sg{Sg}_Rs{rs}_Truesigma0{simulator.sigma0}_TruesigmaRel{round(simulator.sigmaRel,3)}'
+			samplename = f'Ng{Ng}_Sg{Sg}_Rs{rs}_Truesigma0{simulator.sigma0}_TruesigmaRel{round(simulator.sigmaRel,3)}'+(simulator.sigma_fit_s[0]!=0.05)*f'_sigmafit{simulator.sigma_fit_s[0]}'
 			multigal = multi_galaxy_siblings(dfmus,samplename=samplename,sigma0=1.0,eta_sigmaRel_input=None,sigmapec=250,use_external_distances=False,rootpath=rootpath)
 			multigal.n_warmup = 250 ; multigal.n_sampling = 250 ; multigal.n_thin = 250
 
@@ -77,8 +78,9 @@ for rs in np.arange(RS):
 				productpath = copy.deepcopy(multigal.productpath)
 				plotpath    = copy.deepcopy(multigal.plotpath)+'sbc/'
 				if not os.path.exists(plotpath):    os.mkdir(plotpath)
-				sim_sigma0  = copy.deepcopy(simulator.sigma0)
-				modelkey    = copy.deepcopy(multigal.modelkey)
+				sim_sigma0   = copy.deepcopy(simulator.sigma0)
+				sim_sigmafit = copy.deepcopy(simulator.sigma_fit_s[0])
+				modelkey     = copy.deepcopy(multigal.modelkey)
 				multigal.get_parlabels(['rho','sigma0','sigmaRel','sigmaCommon','rel_rat','com_rat','rel_rat2','com_rat2'])
 				dfpars         = dict(zip(multigal.parnames,multigal.dfparnames))
 				parlabels      = dict(zip(multigal.parnames, [x.replace('$','').replace(' (mag)','') for x in multigal.parlabels]))
@@ -100,7 +102,7 @@ GLOB_FITS = {}
 for sigR,RHO in zip(df_vals.sigmaRel.values,df_vals.rho.values):
 	FITS = {}
 	for ISIM in np.arange(RS):
-		samplename = f'Ng{Ng}_Sg{Sg}_Rs{ISIM}_Truesigma0{sim_sigma0}_TruesigmaRel{0 if sigR==0 else round(sigR,3)}'
+		samplename = f'Ng{Ng}_Sg{Sg}_Rs{ISIM}_Truesigma0{sim_sigma0}_TruesigmaRel{0 if sigR==0 else round(sigR,3)}'+(sim_sigmafit!=0.05)*f'_sigmafit{sim_sigmafit}'
 		filename   = productpath+f"FIT{samplename}{modelkey}.pkl"
 		with open(filename,'rb') as f:
 			FIT = pickle.load(f)
@@ -157,6 +159,7 @@ fig.axes[0].set_ylabel('Posterior Densities',fontsize=plotter.FS+2,color='white'
 fig.text(0.1, 0.5, 'Posterior Densities', ha='center', va='center', rotation='vertical',fontsize=plotter.FS)
 fig.subplots_adjust(wspace=0.08,hspace=0.08)
 if args['save']:
+	print (plotpath)
 	pl.savefig(f"{plotpath}SBC_{'.'.join(pars)}.pdf",bbox_inches='tight')
 if args['show']:
 	pl.show()
