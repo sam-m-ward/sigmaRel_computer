@@ -7,6 +7,7 @@ model_files/stan_files/linear_reg/current_model*
 .ipynb_checkpoints/
 bin/
 data/
+analysis/sandbox/ngc3147.py
 model_files/stan_files/MultiGalFiles/altpriors/old/
 model_files/stan_files/MultiGalFiles/original_default_prior/
 model_files/stan_files/LKJ/generator
