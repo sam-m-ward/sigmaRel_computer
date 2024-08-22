@@ -1386,7 +1386,6 @@ class siblings_galaxy:
 		self.sigma0   = sigma0
 		#self.Ngrid   = Ngrid
 		self.sigR_res = sigR_res
-		self.rootpath = rootpath
 		self.FS       = fontsize
 		self.save     = save
 		self.show     = show
@@ -1398,11 +1397,19 @@ class siblings_galaxy:
 		self.n_sampling = 25000
 		self.n_chains   = 4
 
-		self.modelpath   = self.rootpath  + 'model_files/'
-		self.stanpath    = self.modelpath + 'stan_files/'
-		self.productpath = self.rootpath  + 'products/'
-		self.plotpath    = self.rootpath  + 'plots/single_galaxy_plots/'
+		#Paths
+		self.packagepath  = os.path.dirname(os.path.abspath(__file__))#The package path
+		self.rootpath     = rootpath  #The project rootpath
+		self.modelpath    = self.rootpath  + 'model_files/' #Where model_files will be stored (copied to from package)
+		self.stanpath     = self.modelpath + 'stan_files/'
+		self.productpath  = self.rootpath  + 'products/'
+		self.plotpath     = self.rootpath  + 'plots/single_galaxy_plots/'
 		self.create_paths()
+		try:
+			shutil.copytree(os.path.join(self.packagepath,'stan_files'), self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
+		except:
+			print (f"Tried copying stan_files folder from :{os.path.join(self.packagepath,'stan_files')} to {self.modelpath+'stan_files'}")
+			print ("But the latter folder already exists.")
 
 	def get_sigmaRel_posterior(self, prior_distribution='uniform', prior_upper_bound = 1.0):
 		"""
