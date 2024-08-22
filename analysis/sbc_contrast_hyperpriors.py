@@ -7,7 +7,8 @@ from simulate_distances import *
 
 #SBC settings
 Nsim_keep = 100
-Ng = 100 ; Sg = 2; RS=100 ; sigma0 = 'free'
+Ng = 100 ; Sg = 2; RS=100 ; sigma0 = 'free' ; sigma_fit_s = 0.05
+sigma_fit_s = 0.1
 RHOS = [1,0]
 
 pars = ['rho','sigmaRel','sigmaCommon','sigma0'][1:-1]
@@ -23,7 +24,7 @@ args = parser.parse_args().__dict__
 #Perform SBC
 ALT_PRIORS = [False,'C']
 Summary_Strs = []; GLOB_FITS = {} ; productpath = None; plotpath = None; modelkey  = None; sim_sigma0 = None
-simulator  = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=0.1,zcmberr=1e-5,random=42)
+simulator  = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=0.1,zcmberr=1e-5,random=42,sigma_fit_s=sigma_fit_s)
 dfmus      = simulator.dfmus
 dfmus['zhelio_hats'] = dfmus['zcmb_hats'] ; dfmus['zhelio_errs'] = dfmus['zcmb_errs']
 
@@ -36,7 +37,8 @@ for altprior in ALT_PRIORS:
 		productpath = copy.deepcopy(multigal.productpath)
 		plotpath    = copy.deepcopy(multigal.plotpath)+'sbc/'
 		if not os.path.exists(plotpath):    os.mkdir(plotpath)
-		sim_sigma0  = copy.deepcopy(simulator.sigma0)
+		sim_sigma0   = copy.deepcopy(simulator.sigma0)
+		sim_sigmafit = copy.deepcopy(simulator.sigma_fit_s[0])
 		multigal.get_parlabels(['rho','sigma0','sigmaRel','sigmaCommon','rel_rat','com_rat','rel_rat2','com_rat2'])
 		dfpars         = dict(zip(multigal.parnames,multigal.dfparnames))
 		parlabels      = dict(zip(multigal.parnames, [x.replace('$','').replace(' (mag)','') for x in multigal.parlabels]))
@@ -60,7 +62,7 @@ for altprior in ALT_PRIORS:
 	for sigR,RHO in zip(df_vals.sigmaRel.values,df_vals.rho.values):
 		FITS = {}
 		for ISIM in np.arange(RS):
-			samplename = f'Ng{Ng}_Sg{Sg}_Rs{ISIM}_Truesigma0{sim_sigma0}_TruesigmaRel{0 if sigR==0 else round(sigR,3)}'
+			samplename = f'Ng{Ng}_Sg{Sg}_Rs{ISIM}_Truesigma0{sim_sigma0}_TruesigmaRel{0 if sigR==0 else round(sigR,3)}'+(sim_sigmafit!=0.05)*f'_sigmafit{sim_sigmafit}'
 			filename   = productpath+f"FIT{samplename}{modelkeys[altprior]}.pkl"
 			with open(filename,'rb') as f:
 				FIT = pickle.load(f)
