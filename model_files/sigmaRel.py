@@ -41,10 +41,10 @@ siblings_galaxy class:
 		get_CDF()
 		get_quantile(q, return_index=True)
 		get_weighted_mu()
-		combine_individual_distances(mode=None,overwrite=True)
+		combine_individual_distances(mode=None,overwrite=True,asymmetric=False)
 		plot_individual_distances(colours=None,markers=None,markersize=10,capsize=8,mini_d=0.025,plot_full_errors=True)
 		plot_sigmaRel_posteriors(xupperlim=0.16,colours = ['green','purple','goldenrod'], blind=False, fig_ax=None)
-		plot_common_distances(markersize=10,capsize=8,mini_d=0.025)
+		plot_common_distances(markersize=10,capsize=8,mini_d=0.025,asymmetric=None)
 --------------------
 
 Written by Sam M. Ward: smw92@cam.ac.uk
@@ -1393,7 +1393,7 @@ class siblings_galaxy:
 		self.Sg         = int(len(mus))
 		self.fullerrors = np.array([self.sigma0**2 + err**2 for err in self.errors])**0.5
 
-		self.n_warmup   = 250
+		self.n_warmup   = 1000
 		self.n_sampling = 25000
 		self.n_chains   = 4
 
@@ -1537,7 +1537,7 @@ class siblings_galaxy:
 		self.weighted_mu     = sum(self.mus*weights)/sum(weights)
 		self.err_weighted_mu = (1/sum(weights))**0.5
 
-	def combine_individual_distances(self,mode=None,overwrite=True):
+	def combine_individual_distances(self,mode=None,overwrite=True,asymmetric=False):
 		"""
 		Combine Individual Distances
 
@@ -1552,6 +1552,10 @@ class siblings_galaxy:
 		overwrite : bool (optional; default=True)
 			if True, re-run stan fits
 
+		asymmetric : bool or None (optional; default=False)
+			choice of sigmaRel hyperprior, False use Arcsine on rho, True use sigR~U(0,sig0)
+			if None, set to attribute if there or False otherwise
+
 		End Product(s)
 		----------
 		self.common_distance_estimates : dict
@@ -1562,6 +1566,12 @@ class siblings_galaxy:
 			keys are modes, values.keys() are ['data','summary','chains'] from posterior fits
 
 		"""
+		#SigmaRel Hyperprior for dM-Mixed fit
+		if asymmetric is None and 'asymmetric' not in self.__dict__.keys():
+			self.asymmetric = False
+		elif asymmetric in [False,True]:
+			self.asymmetric = asymmetric
+
 		#Stan HBM files for the different intrinsic scatter modelling assumptions
 		stan_files = {  'uncorrelated'  :'CombineIndividualDistances_dMUncorrelated.stan',
 						'mixed'         :'CombineIndividualDistances_dMMixed.stan',
@@ -1574,13 +1584,13 @@ class siblings_galaxy:
 			else:					modes = [mode]
 
 		#If files don't exist or overwrite, do stan fits
-		if not os.path.exists(self.productpath+f"FITS{self.galname}.pkl") or overwrite:
+		if not os.path.exists(self.productpath+f"FITS{self.galname}{'_asym' if self.asymmetric else ''}.pkl") or overwrite:
 			#For each mode, perform stan fit to combine distances
 			STORE = {} ; FITS = {}
 			print ('###'*30)
 			for mode in modes:
 				print (f"Beginning Stan fit adopting the dM-{mode.capitalize()} assumption")
-				stan_data = dict(zip(['S','sigma0','mean_mu','mu_s','mu_err_s'],[self.Sg,self.sigma0,np.average(self.mus),self.mus,self.errors]))
+				stan_data = dict(zip(['S','sigma0','mean_mu','mu_s','mu_err_s','asymmetric'],[self.Sg,self.sigma0,np.average(self.mus),self.mus,self.errors,int(self.asymmetric)]))
 				model = CmdStanModel(stan_file=self.stanpath+stan_files[mode])
 				fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, seed=42)
 				fitsummary  = az.summary(fit)
@@ -1594,10 +1604,10 @@ class siblings_galaxy:
 				print ('~~~'*30)
 				print ('###'*30)
 				FITS[mode] = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
-			with open(self.productpath+f"FITS{self.galname}.pkl",'wb') as f:
+			with open(self.productpath+f"FITS{self.galname}{'_asym' if self.asymmetric else ''}.pkl",'wb') as f:
 				pickle.dump({'FITS':FITS,'common_distance_estimates':STORE},f)
 		else:#Else load up
-			with open(self.productpath+f"FITS{self.galname}.pkl",'rb') as f:
+			with open(self.productpath+f"FITS{self.galname}{'_asym' if self.asymmetric else ''}.pkl",'rb') as f:
 				loader = pickle.load(f)
 			STORE = loader['common_distance_estimates']
 			FITS  = loader['FITS']
@@ -1818,7 +1828,8 @@ class siblings_galaxy:
 			self.fig_ax = [fig,ax,kmax]
 		else:
 			self.fig_ax = fig_ax
-	def plot_common_distances(self,markersize=10,capsize=8,mini_d=0.025):
+
+	def plot_common_distances(self,markersize=10,capsize=8,mini_d=0.025,asymmetric=None):
 		"""
 		Plot Common Distances
 
@@ -1830,9 +1841,17 @@ class siblings_galaxy:
 		capsize : float (optional; default=8)
 			size of errorbar caps
 
-		mini_d : float (optionl; default=0.025)
+		mini_d : float (optional; default=0.025)
 			delta_x value for separating distances visually
+
+		asymmetric : bool or None (optional; default=None)
+			choice of sigmaRel hyperprior, False use Arcsine on rho, True use sigR~U(0,sig0)
+			if None, set to attribute if there or False otherwise
 		"""
+		if asymmetric is None and 'asymmetric' not in self.__dict__.keys():
+			self.asymmetric = False
+		elif asymmetric in [False,True]:
+			self.asymmetric = asymmetric
 
 		fig,ax = pl.subplots(1,1,figsize=(8,6),sharex='col',sharey=False,squeeze=False)
 		fig.axes[0].set_title(r"Combination of Individual Distance Estimates",weight='bold',fontsize=self.FS+0.5)
@@ -1843,8 +1862,9 @@ class siblings_galaxy:
 		colors  = ['r','g','b']
 		mode_labels = [f"$\delta M$-{mode.capitalize()}" for mode in self.common_distance_estimates]
 		sig_labels  = [r'$\sigma_{\rm{Rel}}=\sigma_0$',
-					   r'$\rho \sim \rm{Arcsine}(0,1)$',#r'$\sigma_{\rm{Rel}}\sim U(0,\sigma_0)$',
+					   r'$\rho \sim \rm{Arcsine}(0,1)$',
 					   r'$\sigma_{\rm{Rel}}=0$']
+		if self.asymmetric: sig_labels[1] = r'$\sigma_{\rm{Rel}}\sim U(0,\sigma_0)$'
 
 		mus  = np.array([self.common_distance_estimates[mode]['median'] for mode in self.common_distance_estimates])
 		errs = np.array([self.common_distance_estimates[mode]['std']    for mode in self.common_distance_estimates])
@@ -1883,6 +1903,6 @@ class siblings_galaxy:
 		fig.axes[0].set_xlabel('Intrinsic Scatter Modelling Assumption',fontsize=self.FS+3)
 		pl.tight_layout()
 		if self.save:
-			pl.savefig(f"{self.plotpath}{self.galname}_CommonDistances.pdf", bbox_inches="tight")
+			pl.savefig(f"{self.plotpath}{self.galname}_CommonDistances{'_asym' if self.asymmetric else ''}.pdf", bbox_inches="tight")
 		if self.show:
 			pl.show()
