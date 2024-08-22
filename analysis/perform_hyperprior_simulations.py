@@ -26,20 +26,21 @@ pl.savefig('../plots/hyperprior/legend.pdf',bbox_inches='tight')
 err=1/0
 #'''
 
-Ng = 100 ; Sg = 2 ; RS=10
+Ng = 100 ; Sg = 2 ; RS=10 ; sigma_fit_s = 0.05
+sigma_fit_s = 0.1
 tick_cross = dict(zip([True,False],['\\xmark','\\cmark']))
 Summary_Strs = []
-#for rs in np.arange(RS):
 for rs in [9]:
+#for rs in np.arange(RS):
     for sigR,RHO in zip([0,0.1/((2)**0.5),0.1],[1,0.5,0]):
     #for sigR,RHO in zip([0.1],[0]):
     #for sigR,RHO in zip([0.1/((2)**0.5)],[0.5]):
-        simulator = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=sigR,zcmberr=1e-5,random=42+rs)
+        simulator = SiblingsDistanceSimulator(Ng=Ng,Sg=Sg,external_distances=True,sigmaRel=sigR,zcmberr=1e-5,random=42+rs,sigma_fit_s=0.1)
         dfmus     = simulator.dfmus
         dfmus['zhelio_hats'] = dfmus['zcmb_hats']
         dfmus['zhelio_errs'] = dfmus['zcmb_errs']
 
-        samplename = f'Ng{Ng}_Sg{Sg}_Rs{rs}_Truesigma0{simulator.sigma0}_TruesigmaRel{round(simulator.sigmaRel,3)}'
+        samplename = f'Ng{Ng}_Sg{Sg}_Rs{rs}_Truesigma0{simulator.sigma0}_TruesigmaRel{round(simulator.sigmaRel,3)}'+(simulator.sigma_fit_s[0]!=0.05)*f'_sigmafit{simulator.sigma_fit_s[0]}'
         multigal = multi_galaxy_siblings(dfmus,samplename=samplename,sigma0=1.0,eta_sigmaRel_input=None,sigmapec=250,use_external_distances=False,rootpath=rootpath)
         multigal.n_warmup = 2000 ; multigal.n_sampling = 10000
         #multigal.n_warmup = 10000 ; multigal.n_sampling = 10000
