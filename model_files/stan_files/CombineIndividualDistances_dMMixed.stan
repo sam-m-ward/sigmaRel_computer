@@ -5,6 +5,8 @@ data {
 
   real mean_mu;         //Initial guess of mu used for uninformative prior
   real<lower=0> sigma0; //maximum upper bound on sigma0==sigmaRel
+
+  real<lower=0,upper=1> asymmetric; //SigmaRel Hyperprior
 }
 
 parameters{
@@ -29,8 +31,11 @@ transformed parameters{
 }
 
 model{
-  //sigmaRel      ~ uniform(0,sigma0);
-  rho           ~ beta(0.5,0.5);
+  if (asymmetric==0) {
+    rho ~ beta(0.5,0.5);
+  } else if (asymmetric==1) {
+    target += -log(sqrt(1-rho)); //equiv to sigR~ uniform(0,sig0)
+  }
   eta_dM_Rel_s  ~ std_normal();
   eta_dM_Common ~ std_normal();
   mu            ~ normal(mean_mu,100);

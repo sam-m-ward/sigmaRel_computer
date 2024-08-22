@@ -4,25 +4,30 @@ namespace CombineIndividualDistances_dMMixed_model_namespace {
 using stan::model::model_base_crtp;
 using namespace stan::math;
 stan::math::profile_map profiles__;
-static constexpr std::array<const char*, 27> locations_array__ =
+static constexpr std::array<const char*, 33> locations_array__ =
   {" (found before start of program)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 12, column 2 to column 28)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 13, column 2 to column 25)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 14, column 2 to column 21)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 15, column 2 to column 10)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 19, column 2 to column 25)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 20, column 2 to column 28)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 21, column 2 to column 21)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 22, column 2 to column 17)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 24, column 2 to column 35)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 25, column 2 to column 33)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 27, column 2 to column 41)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 28, column 2 to column 42)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 33, column 2 to column 32)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 34, column 2 to column 31)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 35, column 2 to column 31)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 36, column 2 to column 38)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 38, column 2 to column 58)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 14, column 2 to column 28)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 15, column 2 to column 25)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 16, column 2 to column 21)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 17, column 2 to column 10)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 21, column 2 to column 25)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 22, column 2 to column 28)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 23, column 2 to column 21)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 24, column 2 to column 17)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 26, column 2 to column 35)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 27, column 2 to column 33)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 29, column 2 to column 41)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 30, column 2 to column 42)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 37, column 4 to column 32)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 36, column 28 to line 38, column 3)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 36, column 9 to line 38, column 3)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 35, column 4 to column 24)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 34, column 21 to line 36, column 3)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 34, column 2 to line 38, column 3)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 39, column 2 to column 31)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 40, column 2 to column 31)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 41, column 2 to column 38)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 43, column 2 to column 58)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 2, column 2 to column 17)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 3, column 9 to column 10)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 3, column 2 to column 17)",
@@ -30,8 +35,9 @@ static constexpr std::array<const char*, 27> locations_array__ =
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 4, column 2 to column 21)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 6, column 2 to column 15)",
   " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 7, column 2 to column 23)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 13, column 9 to column 10)",
-  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 21, column 9 to column 10)"};
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 9, column 2 to column 35)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 15, column 9 to column 10)",
+  " (in '/Users/samward/Documents/PhD/sigmaRel_computer/sigmaRel_computer/model_files/stan_files/CombineIndividualDistances_dMMixed.stan', line 23, column 9 to column 10)"};
 class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<CombineIndividualDistances_dMMixed_model> {
  private:
   int S;
@@ -39,6 +45,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
   Eigen::Matrix<double,-1,1> mu_err_s_data__;
   double mean_mu;
   double sigma0;
+  double asymmetric;
   Eigen::Map<Eigen::Matrix<double,-1,1>> mu_s{nullptr, 0};
   Eigen::Map<Eigen::Matrix<double,-1,1>> mu_err_s{nullptr, 0};
  public:
@@ -63,17 +70,17 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
     try {
       int pos__ = std::numeric_limits<int>::min();
       pos__ = 1;
-      current_statement__ = 18;
+      current_statement__ = 23;
       context__.validate_dims("data initialization", "S", "int",
         std::vector<size_t>{});
       S = std::numeric_limits<int>::min();
-      current_statement__ = 18;
+      current_statement__ = 23;
       S = context__.vals_i("S")[(1 - 1)];
-      current_statement__ = 18;
+      current_statement__ = 23;
       stan::math::check_greater_or_equal(function__, "S", S, 1);
-      current_statement__ = 19;
+      current_statement__ = 24;
       stan::math::validate_non_negative_index("mu_s", "S", S);
-      current_statement__ = 20;
+      current_statement__ = 25;
       context__.validate_dims("data initialization", "mu_s", "double",
         std::vector<size_t>{static_cast<size_t>(S)});
       mu_s_data__ = Eigen::Matrix<double,-1,1>::Constant(S,
@@ -82,7 +89,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
         S);
       {
         std::vector<local_scalar_t__> mu_s_flat__;
-        current_statement__ = 20;
+        current_statement__ = 25;
         mu_s_flat__ = context__.vals_r("mu_s");
         pos__ = 1;
         for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
@@ -91,9 +98,9 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
           pos__ = (pos__ + 1);
         }
       }
-      current_statement__ = 21;
+      current_statement__ = 26;
       stan::math::validate_non_negative_index("mu_err_s", "S", S);
-      current_statement__ = 22;
+      current_statement__ = 27;
       context__.validate_dims("data initialization", "mu_err_s", "double",
         std::vector<size_t>{static_cast<size_t>(S)});
       mu_err_s_data__ = Eigen::Matrix<double,-1,1>::Constant(S,
@@ -102,7 +109,7 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
         Eigen::Map<Eigen::Matrix<double,-1,1>>(mu_err_s_data__.data(), S);
       {
         std::vector<local_scalar_t__> mu_err_s_flat__;
-        current_statement__ = 22;
+        current_statement__ = 27;
         mu_err_s_flat__ = context__.vals_r("mu_err_s");
         pos__ = 1;
         for (int sym1__ = 1; sym1__ <= S; ++sym1__) {
@@ -111,23 +118,34 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
           pos__ = (pos__ + 1);
         }
       }
-      current_statement__ = 23;
+      current_statement__ = 28;
       context__.validate_dims("data initialization", "mean_mu", "double",
         std::vector<size_t>{});
       mean_mu = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 23;
+      current_statement__ = 28;
       mean_mu = context__.vals_r("mean_mu")[(1 - 1)];
-      current_statement__ = 24;
+      current_statement__ = 29;
       context__.validate_dims("data initialization", "sigma0", "double",
         std::vector<size_t>{});
       sigma0 = std::numeric_limits<double>::quiet_NaN();
-      current_statement__ = 24;
+      current_statement__ = 29;
       sigma0 = context__.vals_r("sigma0")[(1 - 1)];
-      current_statement__ = 24;
+      current_statement__ = 29;
       stan::math::check_greater_or_equal(function__, "sigma0", sigma0, 0);
-      current_statement__ = 25;
+      current_statement__ = 30;
+      context__.validate_dims("data initialization", "asymmetric", "double",
+        std::vector<size_t>{});
+      asymmetric = std::numeric_limits<double>::quiet_NaN();
+      current_statement__ = 30;
+      asymmetric = context__.vals_r("asymmetric")[(1 - 1)];
+      current_statement__ = 30;
+      stan::math::check_greater_or_equal(function__, "asymmetric",
+        asymmetric, 0);
+      current_statement__ = 30;
+      stan::math::check_less_or_equal(function__, "asymmetric", asymmetric, 1);
+      current_statement__ = 31;
       stan::math::validate_non_negative_index("eta_dM_Rel_s", "S", S);
-      current_statement__ = 26;
+      current_statement__ = 32;
       stan::math::validate_non_negative_index("dM_Rel_s", "S", S);
     } catch (const std::exception& e) {
       stan::lang::rethrow_located(e, locations_array__[current_statement__]);
@@ -199,15 +217,24 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
       stan::math::check_greater_or_equal(function__, "sigmaCommon",
         sigmaCommon, 0);
       {
-        current_statement__ = 13;
-        lp_accum__.add(stan::math::beta_lpdf<propto__>(rho, 0.5, 0.5));
-        current_statement__ = 14;
+        current_statement__ = 18;
+        if (stan::math::logical_eq(asymmetric, 0)) {
+          current_statement__ = 16;
+          lp_accum__.add(stan::math::beta_lpdf<propto__>(rho, 0.5, 0.5));
+        } else {
+          current_statement__ = 15;
+          if (stan::math::logical_eq(asymmetric, 1)) {
+            current_statement__ = 13;
+            lp_accum__.add(-(stan::math::log(stan::math::sqrt((1 - rho)))));
+          }
+        }
+        current_statement__ = 19;
         lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Rel_s));
-        current_statement__ = 15;
+        current_statement__ = 20;
         lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Common));
-        current_statement__ = 16;
+        current_statement__ = 21;
         lp_accum__.add(stan::math::normal_lpdf<propto__>(mu, mean_mu, 100));
-        current_statement__ = 17;
+        current_statement__ = 22;
         lp_accum__.add(stan::math::normal_lpdf<propto__>(mu_s,
                          stan::math::add(stan::math::add(mu, dM_Rel_s),
                            dM_Common), mu_err_s));
@@ -276,15 +303,24 @@ class CombineIndividualDistances_dMMixed_model final : public model_base_crtp<Co
       stan::math::check_greater_or_equal(function__, "sigmaCommon",
         sigmaCommon, 0);
       {
-        current_statement__ = 13;
-        lp_accum__.add(stan::math::beta_lpdf<propto__>(rho, 0.5, 0.5));
-        current_statement__ = 14;
+        current_statement__ = 18;
+        if (stan::math::logical_eq(asymmetric, 0)) {
+          current_statement__ = 16;
+          lp_accum__.add(stan::math::beta_lpdf<propto__>(rho, 0.5, 0.5));
+        } else {
+          current_statement__ = 15;
+          if (stan::math::logical_eq(asymmetric, 1)) {
+            current_statement__ = 13;
+            lp_accum__.add(-(stan::math::log(stan::math::sqrt((1 - rho)))));
+          }
+        }
+        current_statement__ = 19;
         lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Rel_s));
-        current_statement__ = 15;
+        current_statement__ = 20;
         lp_accum__.add(stan::math::std_normal_lpdf<propto__>(eta_dM_Common));
-        current_statement__ = 16;
+        current_statement__ = 21;
         lp_accum__.add(stan::math::normal_lpdf<propto__>(mu, mean_mu, 100));
-        current_statement__ = 17;
+        current_statement__ = 22;
         lp_accum__.add(stan::math::normal_lpdf<propto__>(mu_s,
                          stan::math::add(stan::math::add(mu, dM_Rel_s),
                            dM_Common), mu_err_s));
