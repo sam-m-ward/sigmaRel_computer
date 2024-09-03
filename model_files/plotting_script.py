@@ -10,6 +10,7 @@ Contains:
 Functions:
 	kde(x_data, x_target, y_data=None, y_target=None, x_bounds=None, y_bounds=None, smoothing=1.0)
 	finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=None,lines=True,oneD=False)
+	add_siblings_galaxies(Ng, S_g)
 	get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel)
 
 POSTERIOR_PLOTTER class:
@@ -868,6 +869,28 @@ def finish_corner_plot(fig,ax,Lines,save,show,plotpath,savekey,colour='C0',y0=No
 	if show:
 		pl.show()
 
+def add_siblings_galaxies(Ng, S_g):
+	if type(S_g) in [float, int]:
+		Line = f"$N_{{Gal}}$({S_g} Siblings) = {Ng}"
+		Lines = [Line]
+	else:
+		if list(S_g).count(S_g[0])==len(S_g):
+			Line = f"$N_{{Gal}}\,$({S_g[0]} Sibs./Gal) = {Ng}"
+			Lines = [Line]
+		else:
+			Sgs = list(set(S_g))
+			Sgs.sort()
+			counts = {sg:list(S_g).count(sg) for sg in Sgs}
+			upper = "("
+			for sg in Sgs:
+				upper += str(sg) + ', '
+			upper = upper[:-2]+')'
+			Line  = r"$N^{%s}_{Gal} = ("%upper
+			for sg in counts:
+				Line += str(counts[sg])+', '
+			Lines = [Line[:-2] + ")$"]
+	return Lines
+
 def get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel):
 	"""
 	Get Lines
@@ -922,28 +945,6 @@ def get_Lines(stan_data, c_light, alt_prior, zcosmo, alpha_zhel):
 
 	if alpha_zhel:
 		alpha_zhel_str = r'Modelled $\epsilon_{\mu} = \hat{\alpha} \epsilon_{z_{\rm{Helio}}}$ for %s Galaxies'%(stan_data['Nzhelgal'])
-
-	def add_siblings_galaxies(Ng, S_g):
-		if type(S_g) in [float, int]:
-			Line = f"$N_{{Gal}}$({S_g} Siblings) = {Ng}"
-			Lines = [Line]
-		else:
-			if list(S_g).count(S_g[0])==len(S_g):
-				Line = f"$N_{{Gal}}\,$({S_g[0]} Sibs./Gal) = {Ng}"
-				Lines = [Line]
-			else:
-				Sgs = list(set(S_g))
-				Sgs.sort()
-				counts = {sg:list(S_g).count(sg) for sg in Sgs}
-				upper = "("
-				for sg in Sgs:
-					upper += str(sg) + ', '
-				upper = upper[:-2]+')'
-				Line  = r"$N^{%s}_{Gal} = ("%upper
-				for sg in counts:
-					Line += str(counts[sg])+', '
-				Lines = [Line[:-2] + ")$"]
-		return Lines
 
 	def add_sigma_Line(Lines, fixed_sigma, substr, value, upper_bound, units):
 		if fixed_sigma:
