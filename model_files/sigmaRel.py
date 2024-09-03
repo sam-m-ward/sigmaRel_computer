@@ -58,6 +58,7 @@ import copy, os, pickle, re, shutil, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from model_loader_script import *
 from plotting_script import *
+from ResModel import *
 from astropy.cosmology import FlatLambdaCDM
 from matplotlib import container
 
@@ -289,6 +290,12 @@ class multi_galaxy_siblings:
 		self.get_cosmo_subsample()#Create cosmo_sample column
 		self.og_dfmus = copy.deepcopy(self.dfmus) ; self.og_samplename = copy.deepcopy(self.samplename)
 
+		#Create ResModel
+		self.resmodel = None
+		if len(self.parcols)>2:#i.e. if more than 1 parameter in loader
+			print ('Building ResModel for chromatic parameters')
+			self.resmodel = ResModelLoader(copy.deepcopy(self.dfmus),rootpath=rootpath)
+
 		#Input Posterior Parameters
 		self.master_parnames  = ['mu','AV','theta','RV']
 		self.master_parlabels = ['$\\mu$ (mag)','$A_V$ (mag)','$\\theta$','$\\R_V$']
@@ -313,7 +320,7 @@ class multi_galaxy_siblings:
 			shutil.copytree(os.path.join(self.packagepath,'stan_files'), self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
 		except:
 			print (f"Tried copying stan_files folder from :{os.path.join(self.packagepath,'stan_files')} to {self.modelpath+'stan_files'}")
-			print ("But the latter folder already exists.")
+			print ("But the latter folder already exists; assume this folder is already complete.")
 
 		#Posterior Configuration
 		self.n_warmup   = 1000
@@ -357,6 +364,8 @@ class multi_galaxy_siblings:
 			self.dfmus = self.dfmus[bool_column]
 			self.samplename = key
 
+		if self.resmodel is not None: self.resmodel = ResModelLoader(copy.deepcopy(self.dfmus),rootpath=self.rootpath,samplename=self.samplename)
+
 	def restore_sample(self):
 		"""
 		Restore Sample
@@ -369,6 +378,8 @@ class multi_galaxy_siblings:
 		else:
 			pd.testing.assert_frame_equal(self.dfmus,self.og_dfmus)#Assert they are the same
 			print ('Full sample already in use')
+
+		if self.resmodel is not None: self.resmodel = ResModelLoader(copy.deepcopy(self.dfmus),rootpath=self.rootpath,samplename=self.samplename)
 
 	def update_attributes(self,other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances','zcosmo']):
 		"""
@@ -1409,7 +1420,7 @@ class siblings_galaxy:
 			shutil.copytree(os.path.join(self.packagepath,'stan_files'), self.modelpath+'stan_files')#Copy stan_files from packagepath to modelpath (if local dev. these are the same)
 		except:
 			print (f"Tried copying stan_files folder from :{os.path.join(self.packagepath,'stan_files')} to {self.modelpath+'stan_files'}")
-			print ("But the latter folder already exists.")
+			print ("But the latter folder already exists; assume this folder is already complete.")
 
 	def get_sigmaRel_posterior(self, prior_distribution='uniform', prior_upper_bound = 1.0):
 		"""
