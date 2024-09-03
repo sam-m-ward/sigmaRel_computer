@@ -7,18 +7,21 @@ ResModelLoader class used to perform multiple linear regression between paramete
 Contains:
 --------------------
 ResModelLoader class:
-	inputs: dfmus,rootpath='./',FS=18,verbose=True
+	inputs: dfmus,rootpath='./',samplename='full',FS=18,verbose=True
 
 	Methods are:
 		plot_res_pairs(px='theta',py='mu',show=False,save=True)
 		print_table(PARS=['mu','AV','theta','RV'],verbose=False,returner=False)
-		plot_res(px='theta',py='mu',zerox=True,zeroy=True,show=False,save=True,markersize=10,capsize=2,alpha=0.9,elw=1.5,mew=1.5,text_index=3,annotate_mode=False)
+		plot_res(px='theta',py='mu',zerox=True,zeroy=True,show=False,save=True,markersize=10,capsize=2,alpha=0.9,elw=1.5,mew=1.5,text_index=3,annotate_mode=False,args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)})
 		get_data()
 		get_inits()
 		prepare_stan()
+		reorder_pars(pars)
+		get_pars()
 		get_modelkey()
 		sample_posterior(py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True)
 		get_parlabels()
+		get_res_lines(stan_data)
 		plot_posterior_samples(FS=None,paperstyle=True,quick=True,save=True,show=False, returner=False)
 --------------------
 
@@ -34,7 +37,7 @@ from matplotlib import container
 
 
 class ResModelLoader:
-	def __init__(self,dfmus,rootpath='./',FS=18):
+	def __init__(self,dfmus,rootpath='./',samplename='full',FS=18):
 		"""
 		Initialisation
 
@@ -46,11 +49,15 @@ class ResModelLoader:
 		rootpath : str
 			path/to/sigmaRel/rootpath
 
+		samplename : str (optional; default='full')
+			name of multi-galaxy sample of siblings
+
 		FS : float (optional; default=18)
 			fontsize for plots
 		"""
 		#Data
-		self.dfmus = dfmus
+		self.dfmus       = dfmus
+		self.samplename  = samplename
 
 		#Paths
 		self.rootpath    = rootpath
@@ -62,7 +69,7 @@ class ResModelLoader:
 		self.FS = FS
 
 		#Create residual samples
-		self.PARS = [par for par in ['mu','AV','theta','RV','etaAV'] if f'{par}_samps' in self.dfmus.columns]
+		self.PARS = [par for par in ['mu','theta','etaAV','AV','RV'] if f'{par}_samps' in self.dfmus.columns]
 		def mean_mapper(x):
 			mean_samps = x.mean(axis=0)
 			x = x.apply(lambda x: x-mean_samps)
@@ -71,12 +78,13 @@ class ResModelLoader:
 			self.dfmus[f'{PAR}res_samps'] = self.dfmus.groupby('Galaxy')[f'{PAR}_samps'].transform(lambda x: mean_mapper(x))
 			self.dfmus[f'{PAR}_respoint'] = self.dfmus[f'{PAR}res_samps'].apply(np.median)
 			self.dfmus[f'{PAR}_reserr']   = self.dfmus[f'{PAR}res_samps'].apply(np.std)
-		print (self.dfmus[[col for col in dfmus.columns if 'respoint' in col or 'reserr' in col] + ['Galaxy']])
+		#print (self.dfmus[[col for col in dfmus.columns if 'respoint' in col or 'reserr' in col] + ['Galaxy']])
 
 		#Input Posterior Parameters
-		self.master_parnames  = ['mu','AV','theta','RV','etaAV']
-		self.master_parlabels = ['$\\Delta \\mu$ (mag)','$\\Delta A_V$ (mag)','$\\Delta \\theta$','$\\Delta \\R_V$','$\\Delta \\eta_{A_V}$']
-		self.master_bounds    = [[None,None],[0,None],[None,None],[None,None],[None,None]]
+		self.master_parnames  = ['mu','theta','etaAV','AV','RV']
+		self.master_parlabels = ['$\\Delta \\mu$ (mag)','$\\Delta \\theta$','$\\Delta \\eta_{A_V}$','$\\Delta A_V$ (mag)','$\\Delta \\R_V$']
+		self.master_bounds    = [[None,None],[None,None],[None,None],[0,None],[None,None]]
+		self.plabdict         = {'theta':'\\theta','AV':'A_{V}','etaAV':'\\eta_{A_V}','mu':'\\mu'}
 
 		#Posterior Configuration
 		self.n_warmup   = 10000
@@ -120,7 +128,7 @@ class ResModelLoader:
 		pl.tight_layout()
 		pl.tick_params(labelsize=self.FS)
 		if save:
-			pl.savefig(self.plotpath+f'respairplot_{px}_{py}.pdf',bbox_inches="tight")
+			pl.savefig(self.plotpath+f'respairplot_{px}_{py}_samp{self.samplename}.pdf',bbox_inches="tight")
 		if show:
 			pl.show()
 
@@ -192,7 +200,7 @@ class ResModelLoader:
 		else:
 			print ('\n'.join(lines))
 
-	def plot_res(self,px='theta',py='mu',zerox=True,zeroy=True,show=False,save=True,markersize=10,capsize=2,alpha=0.9,elw=1.5,mew=1.5,text_index=3,annotate_mode=False):
+	def plot_res(self,px='theta',py='mu',zerox=True,zeroy=True,show=False,save=True,markersize=10,capsize=2,alpha=0.9,elw=1.5,mew=1.5,text_index=3,annotate_mode=False,args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}):
 		"""
 		Plot Residuals
 
@@ -212,9 +220,10 @@ class ResModelLoader:
 		markersize,capsize,alpha,elw,mew: float,float,bool,foat (optional;default=14,5,0.9,3,3)
 			size of markers and cap., alpha, elinewidth and markeredgewidth
 
-		text_index, annotate_mode: int, str (optional; default=3, 'legend' or 'text')
+		text_index, annotate_mode, args_legend: int, str (optional; default=3, 'legend' or 'text', {'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)})
 			for example if 'ZTF18abcxyz', specifying 3 returns label '18abcxyz'
 			if legend annotate, put SN names in legend, otherwise, put SN name next to data points
+			legend details
 
 		End Product
 		----------
@@ -264,7 +273,11 @@ class ResModelLoader:
 					zerrs[isn] = [[e68*bunchindex],[e68*(1-bunchindex)]]
 			return zs, zerrs
 
-		fig = pl.figure()
+		#if annotate_mode=='legend':
+		fig = pl.figure(figsize=(9.6*(1+0.25*args_legend['ncols']*(annotate_mode=='legend')+0.5*(annotate_mode is None)),7.2))
+		#elif annotate_mode is None:
+		#	fig = pl.figure()
+
 		#For each galaxy, plot distances
 		for igal,gal in enumerate(self.dfmus['Galaxy'].unique()):
 			dfgal  = self.dfmus[self.dfmus['Galaxy']==gal]
@@ -282,7 +295,6 @@ class ResModelLoader:
 
 		#Legend (needs work)
 		if annotate_mode=='legend':
-			args_legend={'loc':'upper left','ncols':2,'bbox_to_anchor':(1,1.02)}
 			lines, labels = fig.axes[-1].get_legend_handles_labels()
 			lines = [h[0] if isinstance(h, container.ErrorbarContainer) else h for h in lines]
 			fig.axes[0].legend(lines,labels,fontsize=self.FS-2,title='SN Siblings', **args_legend,title_fontsize=self.FS)
@@ -292,7 +304,7 @@ class ResModelLoader:
 		pl.tight_layout()
 		pl.tick_params(labelsize=self.FS)
 		if save:
-			pl.savefig(self.plotpath+f"resplot_{px}{'nozero' if not zerox else ''}_{py}{'nozero' if not zeroy else ''}.pdf",bbox_inches="tight")
+			pl.savefig(self.plotpath+f"resplot_{px}{'nozero' if not zerox else ''}_{py}{'nozero' if not zeroy else ''}_samp{self.samplename}.pdf",bbox_inches="tight")
 		if show:
 			pl.show()
 
@@ -389,6 +401,41 @@ class ResModelLoader:
 		with open(self.stanpath+'current_model.stan','w') as f:
 			f.write(stan_file)
 
+	def reorder_pars(self,pars):
+		"""
+		Re-order pars
+
+		For plotting, orders by chromatic param first, then the object param
+			- mu->theta->etaAV...
+			- and for each, do beta->alpha->sigR->sigC->sigint->rho
+
+		Parameters
+		----------
+			pars : list of str
+				the un-ordered names of the Stan parameters
+
+		Returns
+		----------
+			ordered_pars : list of str
+				ordered pars
+		"""
+		ordered_pars = []
+		for par in [pp for pp in self.PARS if pp in self.pxs + [self.py]]:
+			for x in ['beta','alpha','sigmaRel','sigmaCommon','sigmaint','rho']:
+				if par in self.pxs:
+					_ = self.pxs.index(par)
+					if x!='beta': _ += 1
+				elif par==self.py and x!='beta':
+					_ = 0
+				else:
+					_ = None
+
+				if _!=None:
+					opar = f"{x}[{_+1}]"
+					if opar in pars:
+						ordered_pars.append(opar)
+		return ordered_pars
+
 	def get_pars(self):
 		"""
 		Get Pars
@@ -402,10 +449,10 @@ class ResModelLoader:
 		"""
 		pars  = [f'beta[{_+1}]' for _ in range(len(self.pxs))]
 		pars += [f'alpha[{_+1}]' 		for _ in range(len(self.pxs)+1)]
-		pars += [f'sigmaint[{_+1}]' 	for _ in range(len(self.pxs)+1)]
-		pars += [f'rho[{_+1}]' 			for _ in range(len(self.pxs)+1)]
 		pars += [f'sigmaRel[{_+1}]' 	for _ in range(len(self.pxs)+1)]
 		pars += [f'sigmaCommon[{_+1}]' 	for _ in range(len(self.pxs)+1)]
+		pars += [f'sigmaint[{_+1}]' 	for _ in range(len(self.pxs)+1)]
+		pars += [f'rho[{_+1}]' 			for _ in range(len(self.pxs)+1)]
 		if self.beta is not None:
 			for _ in range(len(self.pxs)):
 				pars.remove(f'beta[{_+1}]')
@@ -416,6 +463,7 @@ class ResModelLoader:
 			pars.remove(f'sigmaCommon[{self.mu_index+1}]')
 		if self.alpha is False: pars = [par for par in pars if 'alpha' not in par]
 
+		pars = self.reorder_pars(pars)
 		return pars
 
 	def get_modelkey(self):
@@ -445,7 +493,7 @@ class ResModelLoader:
 			print ('Fixing beta parameters to:', dict(zip(self.pxs,self.beta)))
 			self.modelkey += f"_fixbeta{'_'.join([str(b) for b in self.beta])}"
 		print ('###'*10)
-		self.filename = f"FIT{self.modelkey}.pkl"
+		self.filename = f"FIT{self.samplename}{self.modelkey}.pkl"
 
 	def sample_posterior(self,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True):
 		"""
@@ -555,13 +603,12 @@ class ResModelLoader:
 		#Initialisation
 		parnames   = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + [f'alpha[{_+1}]' for _ in range(len(self.pxs)+1)] + [f'rho[{_+1}]' for _ in range(len(self.pxs)+1)]
 		dfparnames = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + [f'alpha[{_+1}]' for _ in range(len(self.pxs)+1)] + [f'rho[{_+1}]' for _ in range(len(self.pxs)+1)]
-		pxdict     = {'theta':'\\theta','AV':'A_{V}','etaAV':'\\eta_{A_V}','mu':'\\mu'}
-		parlabels  = ['$\\beta_{%s}$'%(pxdict[px]) for px in self.pxs] + ['$\\alpha^{%s}$'%(pxdict[pxy]) for pxy in [self.py]+self.pxs] + ['$\\rho^{%s}$'%(pxdict[pxy]) for pxy in [self.py]+self.pxs]
+		parlabels  = ['$\\beta_{%s}$'%(self.plabdict[px]) for px in self.pxs] + ['$\\alpha_{%s}$'%(self.plabdict[pxy]) for pxy in [self.py]+self.pxs] + ['$\\rho_{%s}$'%(self.plabdict[pxy]) for pxy in [self.py]+self.pxs]
 		bounds     = [[None,None] for _ in range(len(self.pxs))] + [[None,None] for _ in range(len(self.pxs)+1)] + [[0,1] for _ in range(len(self.pxs)+1)]
 		for intword in ['Rel','Common','int']:
 			parnames   += [f'sigma{intword}[{_+1}]' for _ in range(len(self.pxs)+1)]
 			dfparnames += [f'sigma{intword}[{_+1}]' for _ in range(len(self.pxs)+1)]
-			parlabels  += ['$\\sigma_{\\rm{%s}}^{%s}$'%(intword,pxdict[pxy]) for pxy in [self.py]+self.pxs]
+			parlabels  += ['$\\sigma_{\\rm{%s}}^{%s}$'%(intword if intword!='int' else 'Tot',self.plabdict[pxy]) for pxy in [self.py]+self.pxs]
 			bounds     += [[0,None] for _ in range(len(self.pxs)+1)]
 		parlabels  = [x+' (mag)' if ('sigma' in x and 'mu' in x) else x for x in parlabels]
 
@@ -574,6 +621,43 @@ class ResModelLoader:
 		self.dfparnames = PARS['dfparnames'].values
 		self.parlabels  = PARS['parlabels'].values
 		self.bounds     = PARS['bounds'].values
+
+	def get_res_lines(self,stan_data):
+		"""
+		Get Res Lines
+
+		Simple Method to get descriptive lines for corner plot
+
+		Parameters
+		----------
+		stan_data : dict
+			dictionary of data used in fit
+
+		Returns
+		----------
+		Lines :  list of str
+			descriptive lines
+		"""
+		S_g,Ng = stan_data['S_g'], stan_data['Ng']
+		Lines  = add_siblings_galaxies(Ng,S_g)
+		def modder(x):
+			if '}' in x: 	return x.split('}')[0] + ';\,\\rm{Rel}}'
+			else: 			return x + '_{\\rm{Rel}}'
+		ypar  = self.plabdict[self.py]
+		xpars = [self.plabdict[px] for px in self.pxs]
+		assert(stan_data['Nf'] == int(sum([ss==self.sigint_prior[-1] for ss in self.sigint_prior[1:]])) )#Ensure sigint priors are same for all X params
+		if stan_data['Nf']==1:
+			#Lines += [r"$Y \equiv %s$ ; $X \equiv %s$"%(ypar,xpars[0])]
+			Lines += [r"$%s^s = \beta %s^s + \epsilon^s_{\rm{Rel}}$"%(modder(ypar),modder(xpars[0]))]
+			Lines += [r"$\sigma^{%s}_{\rm{Tot}} \sim U(0,%s)$"%(xpars[0],self.sigint_prior[-1])]
+			Lines += [r"$\rho_{%s} \sim \rm{Arcsine}(0,1)$"%(xpars[0])]
+		else:
+			#Lines += [r"$Y \equiv %s$ ; $X \equiv \{%s\}$"%(ypar,','.join(xpars))]
+			Lines += [r"$X \equiv \{%s\}$"%(','.join(xpars))]
+			Lines += [r"$%s^s = \beta_i X^s_{i;\,\rm{Rel}} + \epsilon^s_{\rm{Rel}}$"%(modder(ypar))]
+			Lines += [r"$\sigma^{X_i}_{\rm{Tot}} \sim U(0,%s)$"%self.sigint_prior[-1]]#Lines += [r"$\mathbf{\sigma}^X_{\rm{Tot}} \sim U(0,%s)$"%self.sigint_prior[-1]]
+			Lines += [r"$\rho_{X_i} \sim \rm{Arcsine}(0,1)$"]#Lines += [r"$\mathbf{\rho}_X \sim \rm{Arcsine}(0,1)$"]
+		return Lines
 
 	def plot_posterior_samples(self, FS=None,paperstyle=True,quick=True,save=True,show=False, returner=False):
 		"""
@@ -629,10 +713,10 @@ class ResModelLoader:
 		self.plotting_parameters = {'FS':FS,'paperstyle':paperstyle,'quick':quick,'save':save,'show':show}
 		postplot = POSTERIOR_PLOTTER(samples, self.parnames, self.parlabels, self.bounds, Rhats, self.plotting_parameters)
 		Summary_Strs = postplot.corner_plot()#Table Summary
-		savekey         = self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
+		savekey         = self.samplename+self.modelkey+'_FullKDE'*bool(not self.plotting_parameters['quick'])+'_NotPaperstyle'*bool(not self.plotting_parameters['paperstyle'])
 		save,quick,show = [self.plotting_parameters[x] for x in ['save','quick','show']][:]
 		#finish_corner_plot(postplot.fig,postplot.ax,get_Lines(stan_data,self.c_light,modelloader.alt_prior),save,show,self.plotpath,savekey)
-		finish_corner_plot(postplot.fig,postplot.ax,[],save,show,self.plotpath,savekey)
+		finish_corner_plot(postplot.fig,postplot.ax,self.get_res_lines(stan_data),save,show,self.plotpath,savekey)
 
 		#Return posterior summaries
 		if returner: return Summary_Strs
