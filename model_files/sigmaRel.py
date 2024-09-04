@@ -20,7 +20,7 @@ multi_galaxy class:
 		restore_sample()
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
-		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, chromatic=None, chrom_beta=None, Rhat_threshold=np.inf, Ntrials=1)
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, chromatic=None, common_beta=None, chrom_beta=None, Rhat_threshold=np.inf, Ntrials=1)
 		add_transformed_params(df,fitsummary)
 		plot_posterior_samples(   FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
 		plot_posterior_samples_1D(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
@@ -437,7 +437,7 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo=None, alpha_zhel=False, chromatic=None, chrom_beta=None, Rhat_threshold=np.inf, Ntrials=1):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo=None, alpha_zhel=False, chromatic=None, common_beta=None, chrom_beta=None, Rhat_threshold=np.inf, Ntrials=1):
 		"""
 		sigmaRel Sampler
 
@@ -491,8 +491,9 @@ class multi_galaxy_siblings:
 		alpha_zhel : bool (optional; default=False)
 			if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
 
-		chromatic, chrom_beta : list of str, list of float (optional; default=None, None)
+		chromatic, common_beta, chrom_beta : list of str, bool or None, list of float (optional; default=None, None, None)
 			if not None, include multiple-linear regression for chromatic parameters
+			if True, beta==beta_rel==beta_common; if False, beta_rel!=beta_common; if None, beta_common=0
 			chrom_beta is None or fix to particular values
 
 		Rhat_threshold : float (optional; default=np.inf)
@@ -510,7 +511,7 @@ class multi_galaxy_siblings:
 		if alpha_zhel and not zmarg:
 			raise Exception('Cannot activate alpha_zhel mode with mu-pipeline; please set zmarg=True')
 		#Initialise model with choices
-		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, chrom_beta, self)
+		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, common_beta, chrom_beta, self)
 		#Get values, either default or user input
 		modelloader.get_model_params()
 		#Get string name for creating/saving files and models
@@ -520,7 +521,7 @@ class multi_galaxy_siblings:
 		#Update class with current values
 		self.update_attributes(modelloader)
 		if chromatic is not None:#If incorporating chromatic parameters
-			self.resmodel.sample_posterior(pxs=chromatic,beta=chrom_beta,run=False)
+			self.resmodel.sample_posterior(pxs=chromatic,beta=chrom_beta,common_beta=common_beta,run=False)
 			self.modelkey += f"_{self.resmodel.modelkey}"
 
 		#If files don't exist or overwrite, do stan fits
