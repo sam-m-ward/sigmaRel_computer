@@ -8,7 +8,7 @@ Methods are useful for preparing data and model before posterior computation
 Contains:
 --------------------
 ModelLoader class:
-	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, chrom_beta, choices
+	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, common_beta, chrom_beta, choices
 
 	Methods are:
 		get_model_params()
@@ -27,7 +27,7 @@ import numpy as np
 
 class ModelLoader:
 
-	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, chrom_beta, choices):
+	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, common_beta, chrom_beta, choices):
 		"""
 		Initialisation
 
@@ -59,8 +59,9 @@ class ModelLoader:
 				-B: sigC ~ U(0,sig0)
 				-C: rho  ~ U(0,1)
 
-		chromatic, chrom_beta : None or list of str, None or list of float
+		chromatic, common_beta, chrom_beta : None or list of str, None or bool, None or list of float
 			choice to include multiple linear regression using chromatic parameters; list of str is names of parameters
+			if True, beta==beta_rel==beta_common; if False, beta_rel!=beta_common; if None, beta_common=0
 			choice to fit of freeze beta hyperparameters; list of floats are fixed values
 
 		zcosmo : str
@@ -83,6 +84,7 @@ class ModelLoader:
 		self.zcosmo                 = zcosmo
 		self.alpha_zhel             = alpha_zhel
 		self.chromatic              = chromatic
+		self.common_beta			= common_beta
 		self.chrom_beta				= chrom_beta
 
 		self.choices  = copy.deepcopy(choices) #Choices inputted in class call
@@ -188,6 +190,13 @@ class ModelLoader:
 			assert(self.alt_prior is False)
 			print (f"Incorporating chromatic parameters: {self.chromatic}")
 			modelkey += f"_chromatic"
+			if self.common_beta is not None:
+				if self.common_beta:
+					print (f"Assuming beta_rel==beta_common")
+					modelkey += f"commonbeta"
+				if not self.common_beta:
+					print (f"Assuming beta_rel!=beta_common")
+					modelkey += f"splitbeta"
 			if self.chrom_beta is not None:
 				print (f"Freezing beta hyperparameters: {self.chrom_beta}")
 				modelkey += f"fixedbeta"
