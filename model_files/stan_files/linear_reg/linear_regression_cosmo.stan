@@ -3,13 +3,14 @@ data {
     int<lower=1> Nf; // No. of features
     int<lower=0> Ng; // No. of siblings galaxies
     array[Ng] int<lower=2> S_g; //No. of siblings per galaxy
+    int<lower=1> Nb; // No. of beta hyperparameters
 
     matrix[Ns,Nf] X;    // Feature matrix
     matrix[Ns,Nf] Xerr; // Feature errors
     vector[Ns] Y;       // Predictor
     vector[Ns] Yerr;    // Predictor errors
 
-    vector[Nf]   beta_prior;   // Prior width on slope parameter
+    vector[Nb]   beta_prior;   // Prior width on slope parameter
     vector[Nf+1] alpha_prior;  // Prior width on alpha parameters        (index 1 is y-disp)
     vector[Nf+1] sigint_prior; // Prior width on y and x-disp parameters (index 1 is y-disp)
     vector[Nf+1] alpha_const;  // Added constant on alpha parameters     (index 1 is y-disp)
@@ -18,6 +19,8 @@ data {
     vector[Ng] mu_ext_gal;
     vector[Ng] zcosmos;
     vector[Ng] zcosmoerrs;
+
+    int<lower=0,upper=1> zero_beta_common; // if zero, no common component of features included, if one, include common component
 
     //real<lower=0,upper=1> sigma0;    //Data
     //real<lower=0,upper=1> pec_unity; //Data
@@ -31,7 +34,7 @@ transformed data{
 }
 
 parameters {
-    vector<lower=0,upper=1>[Nf] etabeta;
+    vector<lower=0,upper=1>[Nb] etabeta;
     vector[Ns*Nf] eta_x_rel;
     vector[Ng*Nf] eta_x_common;
     vector[Ns] eta_y_rel;                     // transformed relative components of latent predictor parameters
@@ -45,12 +48,13 @@ parameters {
 }
 
 transformed parameters {
-    vector[Nf] beta;      // slope hyperparameters
+    vector[Nb] beta;      // slope hyperparameters
     vector[Ns] y_rel;
     vector[Ng] y_common;
     matrix[Ns,Nf] x_rel;
     matrix[Ng,Nf] x_common;
-    matrix[Ns,Nf] x;
+    matrix[Ns,Nf] x;      // X
+    vector[Ns] xb;        // X@beta
     vector[Nf+1] alpha;
     vector[Nf+1] sigmaint;
     vector[Nf+1] sigmaRel;
@@ -77,7 +81,9 @@ transformed parameters {
     for (g in 1:Ng) {
       x[sum(S_g[:g-1])+1:sum(S_g[:g]),:] = x_rel[sum(S_g[:g-1])+1:sum(S_g[:g]),:];
       for (f in 1:Nf) {
-        x[sum(S_g[:g-1])+1:sum(S_g[:g]),f] += x_common[g,f]+alpha[1+f];
+        x[sum(S_g[:g-1])+1:sum(S_g[:g]),f]  += x_common[g,f]+alpha[1+f];
+        xb[sum(S_g[:g-1])+1:sum(S_g[:g])]  = beta[f] * x_rel[sum(S_g[:g-1])+1:sum(S_g[:g]),f];
+        xb[sum(S_g[:g-1])+1:sum(S_g[:g])] += beta[Nb-Nf+f]*x_common[g,f]*zero_beta_common+alpha[1+f];
       }
     }
 }
@@ -94,7 +100,7 @@ model {
     pec_unity     ~ uniform(0,1);
 
     for (g in 1:Ng){
-      Y[sum(S_g[:g-1])+1:sum(S_g[:g])] ~ normal(x[sum(S_g[:g-1])+1:sum(S_g[:g]),:]*beta + y_rel[sum(S_g[:g-1])+1:sum(S_g[:g])] + y_common[g] + alpha[1] + mu_true_gal[g], Yerr[sum(S_g[:g-1])+1:sum(S_g[:g])]); // Measurement-likelihood of photometric distances
+      Y[sum(S_g[:g-1])+1:sum(S_g[:g])] ~ normal(xb[sum(S_g[:g-1])+1:sum(S_g[:g])] + y_rel[sum(S_g[:g-1])+1:sum(S_g[:g])] + y_common[g] + alpha[1] + mu_true_gal[g], Yerr[sum(S_g[:g-1])+1:sum(S_g[:g])]); // Measurement-likelihood of photometric distances
     }
     mu_ext_gal ~ normal(mu_true_gal, mu_ext_gal_errs); // Measurement-likelihood of cosmo distances
 
