@@ -17,9 +17,9 @@ ResModelLoader class:
 		get_inits()
 		prepare_stan()
 		reorder_pars(pars)
-		get_pars()
+		get_pars(cosmo=False)
 		get_modelkey()
-		sample_posterior(py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True)
+		sample_posterior(py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True, run=True)
 		get_parlabels()
 		get_res_lines(stan_data)
 		plot_posterior_samples(FS=None,paperstyle=True,quick=True,save=True,show=False, returner=False)
@@ -407,7 +407,7 @@ class ResModelLoader:
 
 		For plotting, orders by chromatic param first, then the object param
 			- mu->theta->etaAV...
-			- and for each, do beta->alpha->sigR->sigC->sigint->rho
+			- and for each, do beta->alpha->rho->sigint->sigR->sigC
 
 		Parameters
 		----------
@@ -421,7 +421,7 @@ class ResModelLoader:
 		"""
 		ordered_pars = []
 		for par in [pp for pp in self.PARS if pp in self.pxs + [self.py]]:
-			for x in ['beta','alpha','sigmaRel','sigmaCommon','sigmaint','rho']:
+			for x in ['beta','alpha','rho','sigmaint','sigmaRel','sigmaCommon']:
 				if par in self.pxs:
 					_ = self.pxs.index(par)
 					if x!='beta': _ += 1
@@ -436,13 +436,18 @@ class ResModelLoader:
 						ordered_pars.append(opar)
 		return ordered_pars
 
-	def get_pars(self):
+	def get_pars(self,cosmo=False):
 		"""
 		Get Pars
 
 		Gets the parameters used by model
 
-		End Product
+		Parameters
+		----------
+		cosmo: bool (optional; default=False)
+			if True, used in tandem with sigmaRel cosmo-dep, so don't remove e.g. sigmaCommon, sigma0, rho, for distances
+
+		Returns
 		----------
 		pars : list of str
 			the parameter names used/saved in model
@@ -456,7 +461,7 @@ class ResModelLoader:
 		if self.beta is not None:
 			for _ in range(len(self.pxs)):
 				pars.remove(f'beta[{_+1}]')
-		if self.mu_index is not None:
+		if self.mu_index is not None and not cosmo:
 			pars.remove(f'alpha[{self.mu_index+1}]')
 			pars.remove(f'sigmaint[{self.mu_index+1}]')
 			pars.remove(f'rho[{self.mu_index+1}]')
@@ -495,7 +500,7 @@ class ResModelLoader:
 		print ('###'*10)
 		self.filename = f"FIT{self.samplename}{self.modelkey}.pkl"
 
-	def sample_posterior(self,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True):
+	def sample_posterior(self,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True, run=True):
 		"""
 		Sample Posterior
 
@@ -518,6 +523,9 @@ class ResModelLoader:
 		overwrite : bool (optional; default=True)
 			if True, run new fit, else, load up previous fit
 
+		run : bool (optional; default=True)
+			option to run intialisations without actually doing fit
+
 		End Product(s)
 		----------
 		runs stan fit, saves FIT in productpath
@@ -537,57 +545,58 @@ class ResModelLoader:
 			self.alpha_prior[self.mu_index]  = 1e-6
 			self.alpha_const[self.mu_index]  = 0
 			self.sigint_prior[self.mu_index] = 1e-6
-			self.sigint_const[self.mu_index] = 100
+			self.sigint_const[self.mu_index] = 100#Prior width on mus
 		if self.alpha is False:
 			self.alpha_prior = [1e-6 	for _ in range(len(self.pxs)+1)]
 			self.alpha_const = [0 		for _ in range(len(self.pxs)+1)]
 
 		self.get_modelkey()
 
-		#If files don't exist or overwrite, do stan fits
-		if not os.path.exists(self.productpath+self.filename) or overwrite:
-			stan_data = self.get_data()
-			stan_init = self.get_inits()
-			self.prepare_stan()
-			self.pars = self.get_pars()
+		if run:
+			#If files don't exist or overwrite, do stan fits
+			if not os.path.exists(self.productpath+self.filename) or overwrite:
+				stan_data = self.get_data()
+				stan_init = self.get_inits()
+				self.prepare_stan()
+				self.pars = self.get_pars()
 
-			#Initialise and fit model
-			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
-			fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init, seed=42)
-			df          = fit.draws_pd()
+				#Initialise and fit model
+				model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
+				fit         = model.sample(data=stan_data,chains=self.n_chains, iter_sampling=self.n_sampling, iter_warmup = self.n_warmup, inits=stan_init, seed=42)
+				df          = fit.draws_pd()
 
-			#Thin samples
-			if df.shape[0]>self.n_thin*self.n_chains:#Thin samples
-				print (f'Thinning samples down to {self.n_thin} per chain to save on space complexity')
-				Nthinsize = int(self.n_thin*self.n_chains)
-				df = df.iloc[0:df.shape[0]:int(df.shape[0]/Nthinsize)]						#thin to e.g. 1000 samples per chain
-				dfdict = df.to_dict(orient='list')											#change to dictionary so key,value is parameter name and samples
-				fit = {key:np.array_split(value,self.n_chains) for key,value in dfdict.items()}	#change samples so split into chains
+				#Thin samples
+				if df.shape[0]>self.n_thin*self.n_chains:#Thin samples
+					print (f'Thinning samples down to {self.n_thin} per chain to save on space complexity')
+					Nthinsize = int(self.n_thin*self.n_chains)
+					df = df.iloc[0:df.shape[0]:int(df.shape[0]/Nthinsize)]						#thin to e.g. 1000 samples per chain
+					dfdict = df.to_dict(orient='list')											#change to dictionary so key,value is parameter name and samples
+					fit = {key:np.array_split(value,self.n_chains) for key,value in dfdict.items()}	#change samples so split into chains
 
-			#Fitsummary including Rhat valuess
-			fitsummary = az.summary(fit)#feed dictionary into arviz to get summary stats of thinned samples
+				#Fitsummary including Rhat valuess
+				fitsummary = az.summary(fit)#feed dictionary into arviz to get summary stats of thinned samples
 
-			#Save samples
-			FIT = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
-			with open(self.productpath+self.filename,'wb') as f:
-				pickle.dump(FIT,f)
+				#Save samples
+				FIT = dict(zip(['data','summary','chains'],[stan_data,fitsummary,df]))
+				with open(self.productpath+self.filename,'wb') as f:
+					pickle.dump(FIT,f)
 
-			#Print posterior summaries
-			print (f"Fit Completed; Summary is:")
-			for col in self.pars:
-				print ('###'*10)
-				print (f'{col}, median, std, 16, 84 // 68%, 95%')
-				print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
-				print (df[col].quantile(0.68).round(3),df[col].quantile(0.95).round(3))
-				print ('Rhat:', fitsummary.loc[col]['r_hat'])
+				#Print posterior summaries
+				print (f"Fit Completed; Summary is:")
+				for col in self.pars:
+					print ('###'*10)
+					print (f'{col}, median, std, 16, 84 // 68%, 95%')
+					print (df[col].median().round(3),df[col].std().round(3),df[col].quantile(0.16).round(3),df[col].quantile(0.84).round(3))
+					print (df[col].quantile(0.68).round(3),df[col].quantile(0.95).round(3))
+					print ('Rhat:', fitsummary.loc[col]['r_hat'])
 
-		else:#Else load up
-			with open(self.productpath+self.filename,'rb') as f:
-				FIT = pickle.load(f)
-			self.pars = self.get_pars()#For plotting
+			else:#Else load up
+				with open(self.productpath+self.filename,'rb') as f:
+					FIT = pickle.load(f)
+				self.pars = self.get_pars()#For plotting
 
-		#Print distance summaries
-		self.FIT  = FIT
+			#Print distance summaries
+			self.FIT  = FIT
 
 	def get_parlabels(self):
 		"""
@@ -608,9 +617,10 @@ class ResModelLoader:
 		for intword in ['Rel','Common','int']:
 			parnames   += [f'sigma{intword}[{_+1}]' for _ in range(len(self.pxs)+1)]
 			dfparnames += [f'sigma{intword}[{_+1}]' for _ in range(len(self.pxs)+1)]
-			parlabels  += ['$\\sigma_{\\rm{%s}}^{%s}$'%(intword if intword!='int' else 'Tot',self.plabdict[pxy]) for pxy in [self.py]+self.pxs]
+			parlabels  += ['$\\sigma_{\\rm{%s}}^{%s}$'%(intword if intword!='int' else 'Tot' if ii!=self.mu_index else '0',self.plabdict[pxy]) for ii,pxy in enumerate([self.py]+self.pxs)]
 			bounds     += [[0,None] for _ in range(len(self.pxs)+1)]
 		parlabels  = [x+' (mag)' if ('sigma' in x and 'mu' in x) else x for x in parlabels]
+		parlabels  = [x.replace('\mu','') for x in parlabels]
 
 		#Filter on pars
 		PARS  = pd.DataFrame(data=dict(zip(['dfparnames','parlabels','bounds'],[dfparnames,parlabels,bounds])),index=parnames)
@@ -641,6 +651,7 @@ class ResModelLoader:
 		S_g,Ng = stan_data['S_g'], stan_data['Ng']
 		Lines  = add_siblings_galaxies(Ng,S_g)
 		def modder(x):
+			x = x.replace('mu','delta M')
 			if '}' in x: 	return x.split('}')[0] + ';\,\\rm{Rel}}'
 			else: 			return x + '_{\\rm{Rel}}'
 		ypar  = self.plabdict[self.py]
@@ -648,13 +659,18 @@ class ResModelLoader:
 		assert(stan_data['Nf'] == int(sum([ss==self.sigint_prior[-1] for ss in self.sigint_prior[1:]])) )#Ensure sigint priors are same for all X params
 		if stan_data['Nf']==1:
 			#Lines += [r"$Y \equiv %s$ ; $X \equiv %s$"%(ypar,xpars[0])]
-			Lines += [r"$%s^s = \beta %s^s + \epsilon^s_{\rm{Rel}}$"%(modder(ypar),modder(xpars[0]))]
+			Lines += [r"$%s^s = \beta_{%s} %s^s + \epsilon^s_{\rm{Rel}}$"%(modder(ypar),xpars[0],modder(xpars[0]))]
+			if self.beta is not None:
+				Lines[-1] = Lines[-1].replace(r'\beta',r'\hat{\beta}')
+				Lines += [r"$\hat{\beta}_{%s}=%s$"%(xpars[0],self.beta[0])]
 			Lines += [r"$\sigma^{%s}_{\rm{Tot}} \sim U(0,%s)$"%(xpars[0],self.sigint_prior[-1])]
 			Lines += [r"$\rho_{%s} \sim \rm{Arcsine}(0,1)$"%(xpars[0])]
 		else:
 			#Lines += [r"$Y \equiv %s$ ; $X \equiv \{%s\}$"%(ypar,','.join(xpars))]
-			Lines += [r"$X \equiv \{%s\}$"%(','.join(xpars))]
-			Lines += [r"$%s^s = \beta_i X^s_{i;\,\rm{Rel}} + \epsilon^s_{\rm{Rel}}$"%(modder(ypar))]
+			if self.beta is not None:	Lines += [r"$X \equiv \{%s\} ; \hat{\beta} \equiv \{%s\}$"%(','.join(xpars),','.join([str(b) for b in self.beta]))]
+			else:						Lines += [r"$X \equiv \{%s\}$"%(','.join(xpars))]
+			Lines += [r"$%s^s = \beta_{X_i} X^s_{i;\,\rm{Rel}} + \epsilon^s_{\rm{Rel}}$"%(modder(ypar))]
+			if self.beta is not None:	Lines[-1] = Lines[-1].replace(r'\beta',r'\hat{\beta}')
 			Lines += [r"$\sigma^{X_i}_{\rm{Tot}} \sim U(0,%s)$"%self.sigint_prior[-1]]#Lines += [r"$\mathbf{\sigma}^X_{\rm{Tot}} \sim U(0,%s)$"%self.sigint_prior[-1]]
 			Lines += [r"$\rho_{X_i} \sim \rm{Arcsine}(0,1)$"]#Lines += [r"$\mathbf{\rho}_X \sim \rm{Arcsine}(0,1)$"]
 		return Lines
