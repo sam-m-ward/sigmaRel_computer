@@ -20,14 +20,15 @@ data {
 parameters {
     vector[Ns*Nf] eta_x_rel;
     vector[Ng*Nf] eta_x_common;
+    vector[Ns] eta_y_rel;                     // transformed relative components of latent predictor parameters
     vector[Ng] eta_y_common;                  // transformed common components of latent predictor parameters
     vector<lower=0,upper=1>[Nf+1] etaalpha;
     vector<lower=0,upper=1>[Nf+1] etasigint;
     vector<lower=0,upper=1>[Nf+1] rho;
-    vector[Ns] y;                             // latent predictor parameters
 }
 
 transformed parameters {
+    vector[Ns] y_rel;
     vector[Ng] y_common;
     matrix[Ns,Nf] x_rel;
     matrix[Ng,Nf] x_common;
@@ -48,6 +49,7 @@ transformed parameters {
       x_rel[:,f]    = x_rel[:,f]    * sigmaRel[1+f];
       x_common[:,f] = x_common[:,f] * sigmaCommon[1+f];
     }
+    y_rel    = eta_y_rel    * sigmaRel[1];
     y_common = eta_y_common * sigmaCommon[1];
 
     for (g in 1:Ng) {
@@ -61,24 +63,17 @@ transformed parameters {
 model {
     eta_x_rel     ~ std_normal();
     eta_x_common  ~ std_normal();
+    eta_y_rel     ~ std_normal();
     eta_y_common  ~ std_normal();
     etaalpha      ~ uniform(0,1);
     etasigint     ~ uniform(0,1);
     rho           ~ beta(0.5,0.5);
 
     for (g in 1:Ng){
-      y[sum(S_g[:g-1])+1:sum(S_g[:g])] ~ normal(x[sum(S_g[:g-1])+1:sum(S_g[:g]),:]*beta + y_common[g] + alpha[1], sigmaRel[1]); // Model
+      Y[sum(S_g[:g-1])+1:sum(S_g[:g])] ~ normal(x[sum(S_g[:g-1])+1:sum(S_g[:g]),:]*beta + y_rel[sum(S_g[:g-1])+1:sum(S_g[:g])] + y_common[g] + alpha[1], Yerr[sum(S_g[:g-1])+1:sum(S_g[:g])]); // Measurement-likelihood of predictor
     }
 
     for (f in 1:Nf) {
       X[:,f] ~ normal(x[:,f],Xerr[:,f]); // Measurement-likelihood of features
     }
-    Y ~ normal(y, Yerr);                 // Measurement-likelihood of predictor
-}
-
-generated quantities {
-  vector[Ns] res;
-  for (g in 1:Ng) {
-    res[sum(S_g[:g-1])+1:sum(S_g[:g])] = y[sum(S_g[:g-1])+1:sum(S_g[:g])] - x[sum(S_g[:g-1])+1:sum(S_g[:g]),:]*beta - y_common[g]-alpha[1];  // Residuals for each data point
-  }
 }
