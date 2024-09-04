@@ -19,7 +19,7 @@ ResModelLoader class:
 		reorder_pars(pars)
 		get_pars(cosmo=False)
 		get_modelkey()
-		sample_posterior(py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True, run=True)
+		sample_posterior(py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True, run=True, common_beta=None)
 		get_parlabels()
 		get_res_lines(stan_data)
 		plot_posterior_samples(FS=None,paperstyle=True,quick=True,save=True,show=False, returner=False)
@@ -343,6 +343,9 @@ class ResModelLoader:
 			['Ns','Nf','Ng','S_g','X','Xerr','Y','Yerr','alpha_prior',     'beta_prior',	 'sigint_prior',    'alpha_const',     'sigint_const'],
 			[ Ns , Nf , Ng , S_g , X , Xerr , Y , Yerr , self.alpha_prior , self.beta_prior , self.sigint_prior, self.alpha_const , self.sigint_const]
 		))
+		#For cosmo-dep wrapper
+		stan_data['Nb'] = stan_data['Nf']*2 if self.split_beta else stan_data['Nf']
+		stan_data['zero_beta_common'] = 0 if self.common_beta is None else 1
 
 		if self.beta is not None:#Sometimes freeze betas so input these as data
 			stan_data['beta'] = self.beta
@@ -431,9 +434,14 @@ class ResModelLoader:
 					_ = None
 
 				if _!=None:
-					opar = f"{x}[{_+1}]"
-					if opar in pars:
-						ordered_pars.append(opar)
+					if self.split_beta and x=='beta':
+						opar = [f"{x}[{_+1}]",f"{x}[{len(self.pxs)+_+1}]"]
+					else:
+						opar = [f"{x}[{_+1}]"]
+					for op in opar:
+						if op in pars:
+							ordered_pars.append(op)
+
 		return ordered_pars
 
 	def get_pars(self,cosmo=False):
@@ -452,14 +460,14 @@ class ResModelLoader:
 		pars : list of str
 			the parameter names used/saved in model
 		"""
-		pars  = [f'beta[{_+1}]' for _ in range(len(self.pxs))]
+		pars  = [f'beta[{_+1}]' for _ in range(len(self.pxs)*(2 if self.split_beta else 1))]
 		pars += [f'alpha[{_+1}]' 		for _ in range(len(self.pxs)+1)]
 		pars += [f'sigmaRel[{_+1}]' 	for _ in range(len(self.pxs)+1)]
 		pars += [f'sigmaCommon[{_+1}]' 	for _ in range(len(self.pxs)+1)]
 		pars += [f'sigmaint[{_+1}]' 	for _ in range(len(self.pxs)+1)]
 		pars += [f'rho[{_+1}]' 			for _ in range(len(self.pxs)+1)]
 		if self.beta is not None:
-			for _ in range(len(self.pxs)):
+			for _ in range(len(self.pxs)*(2 if self.split_beta else 1)):
 				pars.remove(f'beta[{_+1}]')
 		if self.mu_index is not None and not cosmo:
 			pars.remove(f'alpha[{self.mu_index+1}]')
@@ -467,7 +475,6 @@ class ResModelLoader:
 			pars.remove(f'rho[{self.mu_index+1}]')
 			pars.remove(f'sigmaCommon[{self.mu_index+1}]')
 		if self.alpha is False: pars = [par for par in pars if 'alpha' not in par]
-
 		pars = self.reorder_pars(pars)
 		return pars
 
@@ -495,12 +502,12 @@ class ResModelLoader:
 			print ('Fitting beta parameters')
 			self.modelkey += '_fitbeta'
 		else:
-			print ('Fixing beta parameters to:', dict(zip(self.pxs,self.beta)))
+			print (f'Fixing beta parameters of {self.pxs} to:', self.beta)
 			self.modelkey += f"_fixbeta{'_'.join([str(b) for b in self.beta])}"
 		print ('###'*10)
 		self.filename = f"FIT{self.samplename}{self.modelkey}.pkl"
 
-	def sample_posterior(self,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True, run=True):
+	def sample_posterior(self,py='mu',pxs=['theta'], alpha_prior=10, beta_prior=10, sigint_prior=10, alpha_const=0, sigint_const=0, alpha=False, beta=None, overwrite=True, run=True, common_beta=None):
 		"""
 		Sample Posterior
 
@@ -526,6 +533,10 @@ class ResModelLoader:
 		run : bool (optional; default=True)
 			option to run intialisations without actually doing fit
 
+		common_beta :  None or bool (optional; default=None)
+			Only applicable for when wrapping with cosmo-dep sigmaRel_computer
+			if True, beta==beta_rel==beta_common; if False, beta_rel!=beta_common; if None, beta_common=0
+
 		End Product(s)
 		----------
 		runs stan fit, saves FIT in productpath
@@ -534,9 +545,11 @@ class ResModelLoader:
 		self.py    = py
 		self.pxs   = pxs
 		self.mu_index = 0 if self.py=='mu' else None if 'mu' not in self.pxs else self.pxs.index('mu')+1
+		self.common_beta  = common_beta
+		self.split_beta   = True if self.common_beta==False else False
 		self.alpha        = alpha
-		self.beta         = [beta 			for _ in range(len(self.pxs))] 		if type(beta) 		  in [float,int] else beta
-		self.beta_prior   = [beta_prior 	for _ in range(len(self.pxs))] 		if type(beta_prior)   in [float,int] else beta_prior
+		self.beta         = [beta 			for _ in range(len(self.pxs)*(2 if self.split_beta else 1))] if type(beta) 			in [float,int] else beta
+		self.beta_prior   = [beta_prior 	for _ in range(len(self.pxs)*(2 if self.split_beta else 1))] if type(beta_prior)	in [float,int] else beta_prior
 		self.alpha_prior  = [alpha_prior 	for _ in range(len(self.pxs)+1)] 	if type(alpha_prior)  in [float,int] else alpha_prior
 		self.sigint_prior = [sigint_prior 	for _ in range(len(self.pxs)+1)] 	if type(sigint_prior) in [float,int] else sigint_prior
 		self.alpha_const  = [alpha_const 	for _ in range(len(self.pxs)+1)] 	if type(alpha_const)  in [float,int] else alpha_const
@@ -610,10 +623,16 @@ class ResModelLoader:
 		parnames are names in data, dfparnames are names in model, parlabels are those for plotting, bounds are hard prior bounds on parameters for reflection KDEs
 		"""
 		#Initialisation
-		parnames   = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + [f'alpha[{_+1}]' for _ in range(len(self.pxs)+1)] + [f'rho[{_+1}]' for _ in range(len(self.pxs)+1)]
-		dfparnames = [f'beta[{_+1}]' for _ in range(len(self.pxs))] + [f'alpha[{_+1}]' for _ in range(len(self.pxs)+1)] + [f'rho[{_+1}]' for _ in range(len(self.pxs)+1)]
-		parlabels  = ['$\\beta_{%s}$'%(self.plabdict[px]) for px in self.pxs] + ['$\\alpha_{%s}$'%(self.plabdict[pxy]) for pxy in [self.py]+self.pxs] + ['$\\rho_{%s}$'%(self.plabdict[pxy]) for pxy in [self.py]+self.pxs]
-		bounds     = [[None,None] for _ in range(len(self.pxs))] + [[None,None] for _ in range(len(self.pxs)+1)] + [[0,1] for _ in range(len(self.pxs)+1)]
+		parnames   = [f'beta[{_+1}]' for _ in range(len(self.pxs)*(2 if self.split_beta else 1))] + [f'alpha[{_+1}]' for _ in range(len(self.pxs)+1)] + [f'rho[{_+1}]' for _ in range(len(self.pxs)+1)]
+		dfparnames = [f'beta[{_+1}]' for _ in range(len(self.pxs)*(2 if self.split_beta else 1))] + [f'alpha[{_+1}]' for _ in range(len(self.pxs)+1)] + [f'rho[{_+1}]' for _ in range(len(self.pxs)+1)]
+		if self.common_beta is True:
+			parlabels  = ['$\\beta_{%s}$'%(self.plabdict[px]) for px in self.pxs]
+		else:
+			assert(self.common_beta in [None,False])
+			parlabels  = ['$\\beta_{\\rm{Rel}}^{%s}$'%(self.plabdict[px]) for px in self.pxs]
+			if self.common_beta is False:	parlabels += ['$\\beta_{\\rm{Common}}^{%s}$'%(self.plabdict[px]) for px in self.pxs]
+		parlabels += ['$\\alpha_{%s}$'%(self.plabdict[pxy]) for pxy in [self.py]+self.pxs] + ['$\\rho^{%s}$'%(self.plabdict[pxy]) for pxy in [self.py]+self.pxs]
+		bounds     = [[None,None] for _ in range(len(self.pxs)*(2 if self.split_beta else 1))] + [[None,None] for _ in range(len(self.pxs)+1)] + [[0,1] for _ in range(len(self.pxs)+1)]
 		for intword in ['Rel','Common','int']:
 			parnames   += [f'sigma{intword}[{_+1}]' for _ in range(len(self.pxs)+1)]
 			dfparnames += [f'sigma{intword}[{_+1}]' for _ in range(len(self.pxs)+1)]
@@ -650,29 +669,59 @@ class ResModelLoader:
 		"""
 		S_g,Ng = stan_data['S_g'], stan_data['Ng']
 		Lines  = add_siblings_galaxies(Ng,S_g)
-		def modder(x):
+		def modder(x,word='Rel'):
 			x = x.replace('mu','delta M')
-			if '}' in x: 	return x.split('}')[0] + ';\,\\rm{Rel}}'
-			else: 			return x + '_{\\rm{Rel}}'
+			if word!='':
+				if '}' in x: 	return x.split('}')[0] + ';\,\\rm{%s}}'%word
+				else: 			return x + '_{\\rm{%s}}'%word
+			else:
+				return x
 		ypar  = self.plabdict[self.py]
 		xpars = [self.plabdict[px] for px in self.pxs]
 		assert(stan_data['Nf'] == int(sum([ss==self.sigint_prior[-1] for ss in self.sigint_prior[1:]])) )#Ensure sigint priors are same for all X params
 		if stan_data['Nf']==1:
 			#Lines += [r"$Y \equiv %s$ ; $X \equiv %s$"%(ypar,xpars[0])]
-			Lines += [r"$%s^s = \beta_{%s} %s^s + \epsilon^s_{\rm{Rel}}$"%(modder(ypar),xpars[0],modder(xpars[0]))]
+			if self.split_beta is True:
+				Lines += [r"$%s^s = \beta_{\rm{Rel}}^{%s} %s^s + \beta_{\rm{Common}}^{%s} %s^g + \epsilon^s_{0}$"%(modder(ypar,''),xpars[0],modder(xpars[0]),xpars[0],modder(xpars[0],'Common'))]
+			if self.common_beta is True:
+				Lines += [r"$%s^s = \beta^{%s} %s^s + \epsilon^s_{0}$"%(modder(ypar,''),xpars[0],modder(xpars[0],''))]
+			if self.common_beta is None:
+				Lines += [r"$%s^s = \beta_{\rm{Rel}}^{%s} %s^s + \epsilon^s_{\rm{Rel}}$"%(modder(ypar),xpars[0],modder(xpars[0]))]
 			if self.beta is not None:
 				Lines[-1] = Lines[-1].replace(r'\beta',r'\hat{\beta}')
-				Lines += [r"$\hat{\beta}_{%s}=%s$"%(xpars[0],self.beta[0])]
+				if self.split_beta is True:
+					Lines += [r"$\{ \hat{\beta}_{\rm{Rel}}^{%s},\hat{\beta}_{\rm{Common}}^{%s} \} = \{%s\}$"%(xpars[0],xpars[0],','.join([str(b) for b in self.beta]))]
+				if self.common_beta is True:
+					Lines += [r"$\hat{\beta}^{%s}=%s$"%(xpars[0],self.beta[0])]
+				if self.common_beta is None:
+					Lines += [r"$\hat{\beta}_{\rm{Rel}}^{%s}=%s$"%(xpars[0],self.beta[0])]
+
 			Lines += [r"$\sigma^{%s}_{\rm{Tot}} \sim U(0,%s)$"%(xpars[0],self.sigint_prior[-1])]
-			Lines += [r"$\rho_{%s} \sim \rm{Arcsine}(0,1)$"%(xpars[0])]
+			Lines += [r"$\rho^{%s} \sim \rm{Arcsine}(0,1)$"%(xpars[0])]
 		else:
 			#Lines += [r"$Y \equiv %s$ ; $X \equiv \{%s\}$"%(ypar,','.join(xpars))]
-			if self.beta is not None:	Lines += [r"$X \equiv \{%s\} ; \hat{\beta} \equiv \{%s\}$"%(','.join(xpars),','.join([str(b) for b in self.beta]))]
-			else:						Lines += [r"$X \equiv \{%s\}$"%(','.join(xpars))]
-			Lines += [r"$%s^s = \beta_{X_i} X^s_{i;\,\rm{Rel}} + \epsilon^s_{\rm{Rel}}$"%(modder(ypar))]
-			if self.beta is not None:	Lines[-1] = Lines[-1].replace(r'\beta',r'\hat{\beta}')
+			if self.beta is None:
+				Lines += [r"$X \equiv \{%s\}$"%(','.join(xpars))]
+			else:
+				if self.split_beta is True:
+					rel_betas = ','.join([str(b) for b in self.beta[:len(self.pxs)]]) ; common_betas = ','.join([str(b) for b in self.beta[len(self.pxs):]])
+					Lines += [r"$X \equiv \{%s\} ; \hat{\beta}_{\rm{Rel}} \equiv \{%s\} ; \hat{\beta}_{\rm{Common}} \equiv \{%s\}$"%(','.join(xpars),rel_betas,common_betas)]
+				if self.common_beta is True:
+					Lines += [r"$X \equiv \{%s\} ; \hat{\beta} \equiv \{%s\}$"%(','.join(xpars),','.join([str(b) for b in self.beta]))]
+				if self.common_beta is None:
+					Lines += [r"$X \equiv \{%s\} ; \hat{\beta}_{\rm{Rel}} \equiv \{%s\}$"%(','.join(xpars),','.join([str(b) for b in self.beta]))]
+
+			#Lines += [r"$%s^s = \beta_{X_i} X^s_{i;\,\rm{Rel}} + \epsilon^s_{\rm{Rel}}$"%(modder(ypar))]
+			if self.split_beta is True:
+				Lines += [r"$%s^s = \beta_{\rm{Rel}}^{X_i} X^s_{i;\,\rm{Rel}} + \beta_{\rm{Common}}^{X_i} X^g_{i;\,\rm{Common}} + \epsilon^s_{0}$"%(modder(ypar,''))]
+			if self.common_beta is True:
+				Lines += [r"$%s^s = \beta^{X_i} X^s_{i} + \epsilon^s_{0}$"%(modder(ypar,''))]
+			if self.common_beta is None:
+				Lines += [r"$%s^s = \beta_{\rm{Rel}}^{X_i} X^s_{i;\,\rm{Rel}} + \epsilon^s_{\rm{Rel}}$"%(modder(ypar))]
+			if self.beta is not None:
+				Lines[-1] = Lines[-1].replace(r'\beta',r'\hat{\beta}')
 			Lines += [r"$\sigma^{X_i}_{\rm{Tot}} \sim U(0,%s)$"%self.sigint_prior[-1]]#Lines += [r"$\mathbf{\sigma}^X_{\rm{Tot}} \sim U(0,%s)$"%self.sigint_prior[-1]]
-			Lines += [r"$\rho_{X_i} \sim \rm{Arcsine}(0,1)$"]#Lines += [r"$\mathbf{\rho}_X \sim \rm{Arcsine}(0,1)$"]
+			Lines += [r"$\rho^{X_i} \sim \rm{Arcsine}(0,1)$"]#Lines += [r"$\mathbf{\rho}_X \sim \rm{Arcsine}(0,1)$"]
 		return Lines
 
 	def plot_posterior_samples(self, FS=None,paperstyle=True,quick=True,save=True,show=False, returner=False):
