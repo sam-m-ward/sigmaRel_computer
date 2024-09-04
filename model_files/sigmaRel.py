@@ -20,7 +20,7 @@ multi_galaxy class:
 		restore_sample()
 		update_attributes(other_class,attributes_to_add = ['modelkey','sigma0','sigmapec','sigmaRel_input','eta_sigmaRel_input','use_external_distances'])
 		get_parlabels(pars)
-		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, Rhat_threshold=np.inf, Ntrials=1)
+		sigmaRel_sampler(sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo='zHD', alpha_zhel=False, chromatic=None, chrom_beta=None, Rhat_threshold=np.inf, Ntrials=1)
 		add_transformed_params(df,fitsummary)
 		plot_posterior_samples(   FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
 		plot_posterior_samples_1D(FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False,blind=False,fig_ax=None,**kwargs)
@@ -437,7 +437,7 @@ class multi_galaxy_siblings:
 			self.bounds = [[0,self.sigma0]]
 			print (f'Updating sigmaRel bounds to {self.bounds} seeing as sigma0/sigmapec are fixed')
 
-	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo=None, alpha_zhel=False, Rhat_threshold=np.inf, Ntrials=1):
+	def sigmaRel_sampler(self, sigma0=None, sigmapec=None, eta_sigmaRel_input=None, use_external_distances=None, zmarg=False, alt_prior=False, overwrite=True, blind=False, zcosmo=None, alpha_zhel=False, chromatic=None, chrom_beta=None, Rhat_threshold=np.inf, Ntrials=1):
 		"""
 		sigmaRel Sampler
 
@@ -491,6 +491,10 @@ class multi_galaxy_siblings:
 		alpha_zhel : bool (optional; default=False)
 			if zmarg is True, then alpha_zhel can be activated. This takes the pre-computed slopes of dmu_phot = alpha*dzhelio and marginalises over this in the z-pipeline
 
+		chromatic, chrom_beta : list of str, list of float (optional; default=None, None)
+			if not None, include multiple-linear regression for chromatic parameters
+			chrom_beta is None or fix to particular values
+
 		Rhat_threshold : float (optional; default=np.inf)
 			float value if Rhat>Rhat_threshold redo fit with more samples, repeat for up to Ntrials times
 
@@ -506,7 +510,7 @@ class multi_galaxy_siblings:
 		if alpha_zhel and not zmarg:
 			raise Exception('Cannot activate alpha_zhel mode with mu-pipeline; please set zmarg=True')
 		#Initialise model with choices
-		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, self)
+		modelloader = ModelLoader(sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, chrom_beta, self)
 		#Get values, either default or user input
 		modelloader.get_model_params()
 		#Get string name for creating/saving files and models
@@ -515,6 +519,9 @@ class multi_galaxy_siblings:
 		modelloader.update_stan_file()
 		#Update class with current values
 		self.update_attributes(modelloader)
+		if chromatic is not None:#If incorporating chromatic parameters
+			self.resmodel.sample_posterior(pxs=chromatic,beta=chrom_beta,run=False)
+			self.modelkey += f"_{self.resmodel.modelkey}"
 
 		#If files don't exist or overwrite, do stan fits
 		if not os.path.exists(self.productpath+f"FIT{self.samplename}{self.modelkey}.pkl") or overwrite:
@@ -524,6 +531,13 @@ class multi_galaxy_siblings:
 			stan_data   = modelloader.get_stan_data(dfmus)
 			stan_init   = modelloader.get_stan_init(dfmus, self.productpath, self.n_chains)
 			self.pars   = modelloader.get_pars()
+
+			if chromatic is not None:#If incorporating chromatic parameters
+				stan_data = {**stan_data, **self.resmodel.get_data()}
+				stan_init = self.resmodel.get_inits()
+				self.pars = self.resmodel.get_pars(cosmo=True) ; self.resmodel.pars = copy.deepcopy(self.pars)
+				stan_data['sigint_prior'][0] = 1 ; stan_data['sigint_const'][0] = 0#sigma0 ~ U(0,1)
+				stan_data = {key:stan_data[key] for key in stan_data if key not in ['Nsibs','mu_sib_phots','mu_sib_phot_errs']}
 
 			#Initialise model
 			model       = CmdStanModel(stan_file=self.stanpath+'current_model.stan')
@@ -569,6 +583,8 @@ class multi_galaxy_siblings:
 			with open(self.productpath+f"FIT{self.samplename}{self.modelkey}.pkl",'rb') as f:
 				FIT = pickle.load(f)
 			self.pars   = modelloader.get_pars()#For plotting
+			if chromatic is not None:#If incorporating chromatic parameters
+				self.pars = self.resmodel.get_pars(cosmo=True) ; self.resmodel.pars = copy.deepcopy(self.pars)
 
 		#Print distance summaries
 		self.FIT  = FIT
@@ -594,8 +610,8 @@ class multi_galaxy_siblings:
 		#Added Parameters
 		added_pars = ['rel_rat','com_rat','rel_rat2','com_rat2']
 		try:
-			df['rel_rat'] = df['sigmaRel']/df['sigma0']
-			df['com_rat'] = df['sigmaCommon']/df['sigma0']
+			df['rel_rat']  = df['sigmaRel']/df['sigma0']
+			df['com_rat']  = df['sigmaCommon']/df['sigma0']
 			df['rel_rat2'] = df['sigmaRel'].pow(2)/df['sigma0'].pow(2)
 			df['com_rat2'] = df['sigmaCommon'].pow(2)/df['sigma0'].pow(2)
 			#Appender
@@ -603,7 +619,7 @@ class multi_galaxy_siblings:
 			for x in added_pars:
 				fitsummary.loc[x,'r_hat'] = added_fitsummary.loc[x]['r_hat']
 		except Exception as e:
-			print (e)
+			print (f'Tried adding pars: {added_pars} but encountered exception: {e}')
 		return df, fitsummary
 
 	def plot_posterior_samples(self, FS=18,paperstyle=True,quick=True,save=True,show=False, returner=False, blind=False, fig_ax=None, **kwargs):
@@ -677,6 +693,13 @@ class multi_galaxy_siblings:
 			self.get_parlabels(kwargs['pars'])
 		else:
 			self.get_parlabels(modelloader.get_pars())
+		if self.resmodel.modelkey in self.modelkey:#i.e. if chromatic is not None:
+			self.resmodel.get_parlabels()
+			self.parnames   = self.resmodel.parnames
+			self.dfparnames = self.resmodel.dfparnames
+			self.parlabels  = self.resmodel.parlabels
+			self.bounds		= self.resmodel.bounds
+
 		Rhats      = {par:fitsummary.loc[par]['r_hat'] for par in self.dfparnames}
 		samples    = {par:np.asarray(df[par].values)   for par in self.dfparnames}
 		print ('Rhats:',Rhats)
@@ -728,6 +751,9 @@ class multi_galaxy_siblings:
 				LINES = [L for LL in LINES for L in LL]
 			elif counter+1!=Npanel:
 				LINES = []
+			if self.resmodel.modelkey in self.modelkey:#i.e. if chromatic is not None:
+				res_lines = self.resmodel.get_res_lines(stan_data)
+				LINES = LINES + res_lines[1:]
 			finish_corner_plot(postplot.fig,postplot.ax,LINES,save,show,self.plotpath,savekey,colour if not multiplot else 'black',y0=postplot.y0,lines= not multiplot)
 
 		if multiplot and legend_labels!=['']: postplot.lc += len(legend_labels)
