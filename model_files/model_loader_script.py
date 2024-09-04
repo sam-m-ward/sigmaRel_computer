@@ -8,7 +8,7 @@ Methods are useful for preparing data and model before posterior computation
 Contains:
 --------------------
 ModelLoader class:
-	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, choices
+	inputs: sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, chrom_beta, choices
 
 	Methods are:
 		get_model_params()
@@ -27,7 +27,7 @@ import numpy as np
 
 class ModelLoader:
 
-	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, choices):
+	def __init__(self, sigma0, sigmapec, eta_sigmaRel_input, use_external_distances, zmarg, alt_prior, zcosmo, alpha_zhel, chromatic, chrom_beta, choices):
 		"""
 		Initialisation
 
@@ -59,6 +59,10 @@ class ModelLoader:
 				-B: sigC ~ U(0,sig0)
 				-C: rho  ~ U(0,1)
 
+		chromatic, chrom_beta : None or list of str, None or list of float
+			choice to include multiple linear regression using chromatic parameters; list of str is names of parameters
+			choice to fit of freeze beta hyperparameters; list of floats are fixed values
+
 		zcosmo : str
 			choice of zHD or zcmb
 
@@ -78,6 +82,8 @@ class ModelLoader:
 		if self.alt_prior=='uniform': self.alt_prior='C'  #Simple mapping, uniform hyperprior on rho
 		self.zcosmo                 = zcosmo
 		self.alpha_zhel             = alpha_zhel
+		self.chromatic              = chromatic
+		self.chrom_beta				= chrom_beta
 
 		self.choices  = copy.deepcopy(choices) #Choices inputted in class call
 		self.stanpath = self.choices.stanpath
@@ -177,6 +183,14 @@ class ModelLoader:
 			modelkey += f"_altprior"
 			if self.alt_prior!=True:
 				modelkey+= f'{self.alt_prior}'
+		if self.chromatic is not None:
+			assert(self.zmarg is False)
+			assert(self.alt_prior is False)
+			print (f"Incorporating chromatic parameters: {self.chromatic}")
+			modelkey += f"_chromatic"
+			if self.chrom_beta is not None:
+				print (f"Freezing beta hyperparameters: {self.chrom_beta}")
+				modelkey += f"fixedbeta"
 
 		self.modelkey = modelkey
 		print ('###'*10)
@@ -203,7 +217,13 @@ class ModelLoader:
 		"""
 		#Update stan file according to choices, create temporary 'current_model.stan'
 		if self.alt_prior in [False,True]:
-			self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+			if self.chromatic is None:
+				self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
+			else:
+				if self.chrom_beta is None:
+					self.stan_filename = '../linear_reg/linear_regression_cosmo.stan'
+				else:
+					self.stan_filename = '../linear_reg/linear_regression_fixedB_cosmo.stan'
 		else:
 			self.stan_filename = f'altpriors/sigmaRel_withmuext_alt{self.alt_prior}.stan'
 		#self.stan_filename = {True:{False:'sigmaRel_withmuext.stan',True:'sigmaRel_withmuext_alt5.stan'}[self.alt_prior],False:'sigmaRel_nomuext.stan'}[self.use_external_distances]
